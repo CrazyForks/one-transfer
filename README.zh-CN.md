@@ -4,6 +4,65 @@
 
 > 用光传递数据
 
+<p>
+  <img src="https://img.shields.io/badge/React-19-20232A?logo=react&logoColor=61DAFB" alt="React 19" />
+  <img src="https://img.shields.io/badge/Vite-6-646CFF?logo=vite&logoColor=white" alt="Vite 6" />
+  <img src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white" alt="TypeScript 5" />
+  <img src="https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwind-css&logoColor=white" alt="Tailwind CSS 4" />
+  <img src="https://img.shields.io/badge/shadcn%2Fui-black?logo=shadcnui&logoColor=white" alt="shadcn/ui" />
+  <img src="https://img.shields.io/badge/GSAP-3-0AE448?logo=greensock&logoColor=black" alt="GSAP 3" />
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License" />
+</p>
+
+仓库：[github.com/zhihui-hu/one-transfer](https://github.com/zhihui-hu/one-transfer)
+
+## ✨ 功能特性
+
+- **光学传输：** 文件和文字通过 LT 喷泉码动态二维码发送，无需发送端与接收端建立连接。
+- **文本传文件：** 将文件编码为 `ONE_TRANSFER_V1` Base64 文本，并在 Windows 端恢复。
+- **掉帧容错：** 接收任意足量的不重复帧即可恢复，不依赖逐帧重传。
+- **完整性校验：** 文件容器、长度、FNV-1a、gzip 上限和 SHA-256 分层校验。
+- **浏览器本地处理：** 文件不上传到应用服务器。
+- **离线使用：** PWA 缓存 SPA、Worker、WASM 和 Windows 还原脚本。
+- **现代界面：** React Router、Tailwind CSS、shadcn/ui 与 reduced-motion 友好的 GSAP 动效。
+
+## 🚀 快速开始
+
+```bash
+git clone https://github.com/zhihui-hu/one-transfer.git
+cd one-transfer
+pnpm install
+pnpm dev
+```
+
+打开 `https://127.0.0.1:5173`。需要手机或局域网设备访问时运行：
+
+```bash
+pnpm dev:lan
+```
+
+生产构建与完整检查：
+
+```bash
+pnpm build
+pnpm check
+```
+
+### Cloudflare Pages 一键部署
+
+[![Deploy with Cloudflare Pages](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/zhihui-hu/one-transfer)
+
+如果 Cloudflare 没有自动识别，请使用以下设置：
+
+| 配置项 | 值 |
+|---|---|
+| Framework preset | `Vite` |
+| Build command | `pnpm build` |
+| Build output directory | `dist` |
+| Node.js | `24` 或更高 |
+
+---
+
 ## 摘要
 
 One Transfer 研究两类能力不对称的数据通道。第一类通道只能传递文本，因此系统把文件、
@@ -436,7 +495,7 @@ one-transfer/
 
 ### 10.1 环境要求
 
-- Node.js 22 或更高版本
+- Node.js 24 或更高版本
 - pnpm 10
 - 现代浏览器；接收端需要 WebAssembly、Media Capture 和 Web Worker
 - Windows 接收端需要 Windows PowerShell 与 `Get-Clipboard`
@@ -534,4 +593,8 @@ One Transfer 为两类能力不同的通道定义了一套完整数据流：文�
 
 ## License
 
-MIT。原始版权声明见 [LICENSE](./LICENSE)。
+本项目使用 [MIT License](./LICENSE)。欢迎提交
+[Issue](https://github.com/zhihui-hu/one-transfer/issues) 和 Pull Request。
+
+光学协议与喷泉码实现基于 BashAlarmist 的 Decimen Optical Transfer 演进；原始版权归属与
+当前项目贡献说明见 [LICENSE](./LICENSE) 和 [NOTICE](./NOTICE)。

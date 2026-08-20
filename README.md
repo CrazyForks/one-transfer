@@ -4,6 +4,65 @@
 
 > Transfer data with light.
 
+<p>
+  <img src="https://img.shields.io/badge/React-19-20232A?logo=react&logoColor=61DAFB" alt="React 19" />
+  <img src="https://img.shields.io/badge/Vite-6-646CFF?logo=vite&logoColor=white" alt="Vite 6" />
+  <img src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white" alt="TypeScript 5" />
+  <img src="https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwind-css&logoColor=white" alt="Tailwind CSS 4" />
+  <img src="https://img.shields.io/badge/shadcn%2Fui-black?logo=shadcnui&logoColor=white" alt="shadcn/ui" />
+  <img src="https://img.shields.io/badge/GSAP-3-0AE448?logo=greensock&logoColor=black" alt="GSAP 3" />
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License" />
+</p>
+
+Repository: [github.com/zhihui-hu/one-transfer](https://github.com/zhihui-hu/one-transfer)
+
+## ✨ Highlights
+
+- **Optical transfer:** send files and text as LT fountain-coded animated QR frames without a connection between endpoints.
+- **Files over text:** encode a file as a versioned `ONE_TRANSFER_V1` Base64 record and restore it on Windows.
+- **Frame-loss tolerance:** recover from any sufficient set of distinct frames without per-frame retransmission.
+- **Layered integrity:** validate container structure, lengths, FNV-1a, gzip bounds, and SHA-256.
+- **Local processing:** business files never upload to the application server.
+- **Offline operation:** PWA caching includes the SPA, worker, WASM decoder, and Windows restorer.
+- **Modern UI:** React Router, Tailwind CSS, shadcn/ui, and reduced-motion-aware GSAP transitions.
+
+## 🚀 Quick Start
+
+```bash
+git clone https://github.com/zhihui-hu/one-transfer.git
+cd one-transfer
+pnpm install
+pnpm dev
+```
+
+Open `https://127.0.0.1:5173`. For a phone or another LAN device, run:
+
+```bash
+pnpm dev:lan
+```
+
+Production build and full project check:
+
+```bash
+pnpm build
+pnpm check
+```
+
+### One-click Cloudflare Pages Deployment
+
+[![Deploy with Cloudflare Pages](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/zhihui-hu/one-transfer)
+
+If Cloudflare does not detect the project automatically, use:
+
+| Setting | Value |
+|---|---|
+| Framework preset | `Vite` |
+| Build command | `pnpm build` |
+| Build output directory | `dist` |
+| Node.js | `24` or newer |
+
+---
+
 ## Abstract
 
 One Transfer defines data representations for two asymmetric channel classes. A text-only channel
@@ -435,7 +494,7 @@ the `ONE_TRANSFER_V1` protocol with the browser implementation.
 
 ### 10.1 Requirements
 
-- Node.js 22+
+- Node.js 24+
 - pnpm 10
 - A modern browser with WebAssembly, Media Capture, and Web Worker support
 - Windows PowerShell with `Get-Clipboard` on the inbound receiver
@@ -527,4 +586,8 @@ the underlying text clipboard and visible-screen channels.
 
 ## License
 
-MIT. See [LICENSE](./LICENSE) for the original copyright notice.
+This project is released under the [MIT License](./LICENSE). Issues and pull requests are welcome at
+[github.com/zhihui-hu/one-transfer](https://github.com/zhihui-hu/one-transfer).
+
+The optical protocol and fountain-code implementation evolved from BashAlarmist's Decimen Optical
+Transfer. See [LICENSE](./LICENSE) and [NOTICE](./NOTICE) for attribution and contributor notices.

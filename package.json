@@ -2,7 +2,21 @@
   "name": "one-transfer",
   "private": true,
   "version": "0.2.0",
+  "packageManager": "pnpm@10.32.1",
+  "engines": {
+    "node": ">=24",
+    "pnpm": ">=10"
+  },
   "license": "MIT",
+  "author": "zhihui-hu",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zhihui-hu/one-transfer.git"
+  },
+  "homepage": "https://github.com/zhihui-hu/one-transfer#readme",
+  "bugs": {
+    "url": "https://github.com/zhihui-hu/one-transfer/issues"
+  },
   "description": "Browser file and text transfer over animated QR codes or a text clipboard.",
   "type": "module",
   "scripts": {
