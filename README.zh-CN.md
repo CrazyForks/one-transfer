@@ -217,8 +217,8 @@ HTML 入口只保留一份内联关键启动屏。React 完成挂载并加载传
 1. 校验文件名是否能在 Windows 使用，包括非法字符、结尾空格/句点和保留设备名。
 2. 使用 `File.arrayBuffer()` 在浏览器本地读取文件字节。
 3. 将 UTF-8 文件名和文件内容分别编码为 Base64。
-4. 组成 `ONE_TRANSFER_V1` 文本并调用 Clipboard API 写入剪贴板。
-5. 如果现代 Clipboard API 不可用，则使用隐藏文本域执行兼容复制。
+4. 组成 `ONE_TRANSFER_V1` 文本并一键写入剪贴板，不在页面显示文件 Base64 内容。
+5. 如果现代 Clipboard API 不可用，则使用临时文本域与 `execCommand` 兼容复制。
 
 Base64 的理论长度为 `4 × ceil(n / 3)`，因此文本通常约为原始文件的 1.33 倍，尚未包含
 协议头和文件名。实际可传大小受浏览器和具体文本通道容量共同限制。
@@ -243,7 +243,8 @@ ONE_TRANSFER_V1|<itemType>|<base64(UTF-8 name)>|<base64(payload)>
 
 ### 4.3 Windows 还原流程
 
-Windows 接收端首次使用时，从 `#/clipboard` 下载 `restore-base64.bat` 并放入目标目录。
+Windows 接收端首次使用时，可以从 `#/clipboard` 下载 `restore-base64.bat`，也可以复制页面
+中显示的完整脚本源码并保存为同名文件，然后放入目标目录。
 每次接收时双击该脚本：
 
 1. 检查 Windows PowerShell 是否存在。
@@ -529,11 +530,10 @@ make deploy
 Makefile 会读取本地 `.env` 中的 Cloudflare 凭据，执行构建后使用 Wrangler 部署
 `dist/`。Wrangler 项目名为 `one-transfer`。
 
-### 10.4 GitHub Actions
+### 10.4 GitHub Pages 自动部署
 
-- `ci.yml`：安装锁定依赖，运行测试和构建，并检查 SPA/PWA 必需产物。
-- `pages.yml`：构建并部署 `dist/` 到 GitHub Pages。
-- `release.yml`：对版本标签构建可托管的 `one-transfer-<tag>-site.zip`。
+仓库只保留 `pages.yml`：推送到 `main` 或手动触发时构建 `dist/`，并部署到
+GitHub Pages。
 
 ---
 

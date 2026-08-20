@@ -100,6 +100,24 @@ function Header({ route, transitionTo }: { route: RouteKey; transitionTo: (to: s
   );
 }
 
+function Footer() {
+  return (
+    <footer className="relative z-10 flex min-h-14 items-center justify-center border-t border-black/[0.06] px-4 py-4 text-center">
+      <a
+        href="https://github.com/zhihui-hu/one-transfer"
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex items-center gap-2 text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/15"
+      >
+        <svg viewBox="0 0 24 24" className="size-4 fill-current" aria-hidden="true">
+          <path d="M12 .7a11.5 11.5 0 0 0-3.64 22.41c.58.11.79-.25.79-.56v-2.23c-3.22.7-3.9-1.37-3.9-1.37-.52-1.34-1.28-1.69-1.28-1.69-1.05-.72.08-.71.08-.71 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.57-.29-5.27-1.29-5.27-5.69 0-1.26.45-2.29 1.19-3.09-.12-.29-.52-1.47.11-3.05 0 0 .97-.31 3.16 1.18A10.9 10.9 0 0 1 12 6.11c.98 0 1.95.13 2.87.39 2.2-1.49 3.16-1.18 3.16-1.18.63 1.58.23 2.76.11 3.05.74.8 1.19 1.83 1.19 3.09 0 4.41-2.71 5.39-5.29 5.68.42.36.79 1.07.79 2.16v3.25c0 .31.21.68.8.56A11.5 11.5 0 0 0 12 .7Z" />
+        </svg>
+        github.com/zhihui-hu/one-transfer
+      </a>
+    </footer>
+  );
+}
+
 const transferCards = [
   { to: "/send", title: "发送", description: "播放文件或文字二维码", icon: Upload },
   { to: "/receive", title: "接收", description: "扫描屏幕或使用相机", icon: ScanLine },
@@ -152,7 +170,7 @@ function SendModeTabs() {
     gsap.to(indicator, {
       x: trigger.offsetLeft - 4,
       width: trigger.offsetWidth,
-      duration: 0.38,
+      duration: 0.22,
       ease: "power3.out",
       overwrite: "auto",
     });
@@ -170,8 +188,8 @@ function SendModeTabs() {
       if (!pane || pane.hidden) return;
       gsap.fromTo(
         pane,
-        { autoAlpha: 0, y: 10 },
-        { autoAlpha: 1, y: 0, duration: 0.38, ease: "power3.out", clearProps: "opacity,visibility,transform" },
+        { autoAlpha: 0.65, y: 6 },
+        { autoAlpha: 1, y: 0, duration: 0.24, ease: "power3.out", clearProps: "opacity,visibility,transform" },
       );
     });
   };
@@ -225,7 +243,7 @@ function SendView() {
     <main data-route-page data-view="send" className={viewShell}>
       <section data-reveal className="relative z-10 mb-4 w-full text-center">
         <h1 id="tool-title" className={headingClass}>发送文件</h1>
-        <p className="mt-3.5 text-base text-zinc-500">选择内容后，二维码会自动开始播放。</p>
+        <p data-breathe className="mt-3.5 text-base text-zinc-500">选择内容后，二维码会自动开始播放。</p>
       </section>
       <div data-reveal className="relative z-10 w-full"><SendModeTabs /></div>
       <div className="status-line relative z-10 min-h-5 w-full text-center font-mono text-xs text-zinc-500" id="specs">选择文件开始</div>
@@ -259,7 +277,7 @@ function ReceiveView() {
     <main data-route-page data-view="receive" className={viewShell}>
       <section className="receiver-primary relative z-10 flex w-full flex-col items-center gap-3.5 text-center">
         <div data-reveal className="mb-2 w-full text-center">
-          <h1 className={headingClass}>接收</h1>
+          <h1 data-breathe className={headingClass}>接收</h1>
           <div className="status-line mt-3.5 min-h-5 text-center font-mono text-xs text-zinc-500" id="stats">选择扫描方式开始</div>
         </div>
         <div data-reveal className="capture-actions flex flex-wrap justify-center gap-2.5" id="capture-actions">
@@ -289,25 +307,83 @@ function ReceiveView() {
   );
 }
 
+function RestoreScriptPanel() {
+  const [script, setScript] = useState("");
+  const [copyLabel, setCopyLabel] = useState("复制脚本源码");
+  const [error, setError] = useState<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(new URL("restore-base64.bat", document.baseURI), { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.text();
+      })
+      .then(setScript)
+      .catch((reason) => {
+        if (reason instanceof DOMException && reason.name === "AbortError") return;
+        setError("还原脚本加载失败，请使用下载按钮。");
+      });
+    return () => controller.abort();
+  }, []);
+
+  const copyScript = async () => {
+    if (!script) return;
+    try {
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(script);
+      else {
+        textareaRef.current?.focus();
+        textareaRef.current?.select();
+        if (!document.execCommand("copy")) throw new Error("copy failed");
+      }
+      setCopyLabel("已复制 · 再次复制");
+    } catch {
+      setCopyLabel("复制失败，请手动全选复制");
+    }
+  };
+
+  return (
+    <Card data-reveal className="relative z-10 w-full">
+      <CardContent className="grid justify-items-center gap-4 p-6 text-center">
+        <div className="grid justify-items-center gap-1">
+          <span className="text-[11px] font-bold tracking-wider text-blue-600">WINDOWS 接收端 · 首次使用</span>
+          <strong>Windows 文件还原脚本</strong>
+          <span className="text-sm text-zinc-500">下载脚本，或复制下方源码并保存为 restore-base64.bat。</span>
+        </div>
+        <textarea
+          ref={textareaRef}
+          value={script}
+          readOnly
+          rows={12}
+          spellCheck={false}
+          aria-label="restore-base64.bat 脚本源码"
+          onFocus={(event) => event.currentTarget.select()}
+          className="w-full resize-y rounded-xl border border-black/10 bg-zinc-50 p-4 text-left font-mono text-xs leading-relaxed text-zinc-700 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+          placeholder="正在加载 restore-base64.bat…"
+        />
+        {error ? <span className="text-sm font-medium text-red-600">{error}</span> : null}
+        <div className="flex flex-col items-center justify-center gap-2 sm:flex-row">
+          <Button type="button" variant="outline" disabled={!script} onClick={() => void copyScript()}>
+            <ClipboardPaste />{copyLabel}
+          </Button>
+          <Button asChild>
+            <a href="./restore-base64.bat" download="restore-base64.bat"><Download />下载还原脚本</a>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function ClipboardView() {
   return (
     <main data-route-page data-view="clipboard" className={viewShell}>
       <section data-reveal className="relative z-10 mb-4 w-full text-center">
         <h1 className={headingClass}>通过文本剪贴板传文件</h1>
-        <p className="mt-3.5 text-base text-zinc-500">把文件编码为 Base64 文本复制，再在 Windows 接收端还原。</p>
+        <p data-breathe className="mt-3.5 text-base text-zinc-500">把文件编码为 Base64 文本复制，再在 Windows 接收端还原。</p>
       </section>
-      <Card data-reveal className="relative z-10 w-full">
-        <CardContent className="flex flex-col items-center justify-center gap-4 p-6 text-center">
-          <div className="grid justify-items-center gap-1">
-            <span className="text-[11px] font-bold tracking-wider text-blue-600">WINDOWS 接收端 · 首次使用</span>
-            <strong id="restore-title">下载 Windows 还原脚本</strong>
-            <span className="text-sm text-zinc-500">在接收端打开本页，把脚本下载到文件接收目录，只需准备一次。</span>
-          </div>
-          <Button asChild className="shrink-0">
-            <a href="./restore-base64.bat" download="restore-base64.bat"><Download />下载还原脚本</a>
-          </Button>
-        </CardContent>
-      </Card>
+      <RestoreScriptPanel />
       <div className="status-line relative z-10 min-h-5 w-full text-center font-mono text-xs text-zinc-500" id="clipboard-status" aria-live="polite">请在发送端选择要传递的文件</div>
       <FileSelectPanel
         inputId="clipboard-file"
@@ -315,8 +391,8 @@ function ClipboardView() {
         fileNameId="clipboard-file-name"
       />
       <div data-reveal className="relative z-10 flex w-full flex-col items-center gap-3.5 text-center">
-        <Button id="copy-transfer" type="button" disabled>复制到剪贴板</Button>
-        <span className="text-sm text-zinc-500">只复制 Base64 文本，不会上传文件；文本大小约为原文件的 1.33 倍。</span>
+        <Button id="copy-transfer" type="button" disabled>复制文件数据到剪贴板</Button>
+        <span className="text-sm text-zinc-500">只复制 Base64 文件数据，不在页面显示；文本大小约为原文件的 1.33 倍。</span>
       </div>
     </main>
   );
@@ -385,28 +461,11 @@ function TransferLayout() {
   const [loaderVisible, setLoaderVisible] = useState(true);
   const overlayRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const routeTweenRef = useRef<gsap.core.Tween | null>(null);
 
   const transitionTo = useCallback(
     (to: string) => {
       if (location.pathname === to) return;
-      routeTweenRef.current?.kill();
-      const currentPage = contentRef.current?.querySelector<HTMLElement>("[data-route-page]");
-      if (!currentPage || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-        navigate(to);
-        return;
-      }
-      routeTweenRef.current = gsap.to(currentPage, {
-        autoAlpha: 0,
-        y: -10,
-        duration: 0.22,
-        ease: "power2.in",
-        overwrite: "auto",
-        onComplete: () => {
-          routeTweenRef.current = null;
-          navigate(to);
-        },
-      });
+      navigate(to);
     },
     [location.pathname, navigate],
   );
@@ -461,17 +520,17 @@ function TransferLayout() {
       mm.add("(prefers-reduced-motion: no-preference)", () => {
         const entrance = gsap.timeline({ defaults: { ease: "power3.out" } });
         entrance
-          .fromTo(page, { autoAlpha: 0, y: 12 }, { autoAlpha: 1, y: 0, duration: 0.46 })
+          .fromTo(page, { autoAlpha: 0.7, y: 8 }, { autoAlpha: 1, y: 0, duration: 0.3 })
           .fromTo(
             page.querySelectorAll("[data-reveal]"),
-            { autoAlpha: 0, y: 16 },
-            { autoAlpha: 1, y: 0, duration: 0.5, stagger: 0.06 },
-            "-=0.28",
+            { autoAlpha: 0.75, y: 10 },
+            { autoAlpha: 1, y: 0, duration: 0.32, stagger: 0.035 },
+            "-=0.2",
           );
         const breathing = gsap.to(page.querySelectorAll("[data-breathe]"), {
-          scale: 1.02,
-          autoAlpha: 0.82,
-          duration: 2.8,
+          scale: 1.012,
+          autoAlpha: 0.9,
+          duration: 2.4,
           ease: "sine.inOut",
           repeat: -1,
           yoyo: true,
@@ -483,19 +542,13 @@ function TransferLayout() {
     return () => context.revert();
   }, [location.pathname]);
 
-  useEffect(
-    () => () => {
-      routeTweenRef.current?.kill();
-    },
-    [],
-  );
-
   return (
     <>
       {loaderVisible ? <LoadingScreen overlayRef={overlayRef} /> : null}
       <div ref={contentRef} className="app-content min-h-svh">
         <Header route={route} transitionTo={transitionTo} />
         <Outlet context={{ transitionTo } satisfies RouteOutletContext} />
+        <Footer />
       </div>
     </>
   );

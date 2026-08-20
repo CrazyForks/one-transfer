@@ -18,7 +18,7 @@ async function prepareFile(): Promise<void> {
   payload = null;
   selectedName = "";
   copyButton.disabled = true;
-  copyButton.textContent = "复制到剪贴板";
+  copyButton.textContent = "复制文件数据到剪贴板";
 
   if (!file) {
     status.setStatus("请在发送端选择要传递的文件");
@@ -69,7 +69,7 @@ async function copyTransfer(): Promise<void> {
   try {
     await writeClipboard(payload);
     status.setStatus(`${selectedName} 已复制为文本，请到 Windows 接收端运行还原脚本`);
-    copyButton.textContent = "重新复制";
+    copyButton.textContent = "已复制 · 再次复制";
   } catch {
     status.showError("复制失败，请允许浏览器写入剪贴板后重试");
   } finally {

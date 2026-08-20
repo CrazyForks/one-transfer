@@ -220,8 +220,8 @@ On `#/clipboard`, the external sender:
 1. Validates that the selected filename can be created on Windows.
 2. Reads bytes locally through `File.arrayBuffer()`.
 3. Base64-encodes the UTF-8 filename and raw payload.
-4. Constructs a `ONE_TRANSFER_V1` record.
-5. Writes the record through the Clipboard API, with a legacy text-area fallback.
+4. Constructs the `ONE_TRANSFER_V1` record and copies it without rendering the Base64 payload on page.
+5. Uses a temporary text area with `execCommand` when the modern Clipboard API is unavailable.
 
 For a file of `N` bytes, Base64 requires approximately:
 
@@ -252,8 +252,9 @@ The web UI handles one file per operation. On a Mac sender, a directory can be p
 
 ### 4.3 Windows Restoration
 
-The Windows receiver downloads `restore-base64.bat` from `#/clipboard` and places it in the desired
-destination directory. On each run, the script:
+The Windows receiver can download `restore-base64.bat` from `#/clipboard`, or copy the complete script
+source displayed on the page and save it under that filename. Place it in the desired destination
+directory. On each run, the script:
 
 1. Checks for Windows PowerShell.
 2. reads clipboard text using `Get-Clipboard -Raw`;
@@ -525,11 +526,10 @@ make deploy
 The Makefile loads local Cloudflare credentials from `.env`, builds `dist/`, and deploys the Wrangler
 project `one-transfer`.
 
-### 10.4 Automation
+### 10.4 GitHub Pages Automation
 
-- `ci.yml`: locked install, tests, build, and SPA/PWA artifact checks.
-- `pages.yml`: GitHub Pages deployment.
-- `release.yml`: hostable `one-transfer-<tag>-site.zip` release artifact.
+The repository keeps a single workflow: `pages.yml`. A push to `main` or a
+manual dispatch builds `dist/` and deploys it to GitHub Pages.
 
 ---
 
