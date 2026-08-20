@@ -170,7 +170,7 @@ function SendModeTabs() {
     gsap.to(indicator, {
       x: trigger.offsetLeft - 4,
       width: trigger.offsetWidth,
-      duration: 0.22,
+      duration: 0.14,
       ease: "power3.out",
       overwrite: "auto",
     });
@@ -188,8 +188,8 @@ function SendModeTabs() {
       if (!pane || pane.hidden) return;
       gsap.fromTo(
         pane,
-        { autoAlpha: 0.65, y: 6 },
-        { autoAlpha: 1, y: 0, duration: 0.24, ease: "power3.out", clearProps: "opacity,visibility,transform" },
+        { y: 4 },
+        { y: 0, duration: 0.16, ease: "power3.out", clearProps: "transform" },
       );
     });
   };
@@ -383,7 +383,6 @@ function ClipboardView() {
         <h1 className={headingClass}>通过文本剪贴板传文件</h1>
         <p data-breathe className="mt-3.5 text-base text-zinc-500">把文件编码为 Base64 文本复制，再在 Windows 接收端还原。</p>
       </section>
-      <RestoreScriptPanel />
       <div className="status-line relative z-10 min-h-5 w-full text-center font-mono text-xs text-zinc-500" id="clipboard-status" aria-live="polite">请在发送端选择要传递的文件</div>
       <FileSelectPanel
         inputId="clipboard-file"
@@ -394,6 +393,7 @@ function ClipboardView() {
         <Button id="copy-transfer" type="button" disabled>复制文件数据到剪贴板</Button>
         <span className="text-sm text-zinc-500">只复制 Base64 文件数据，不在页面显示；文本大小约为原文件的 1.33 倍。</span>
       </div>
+      <RestoreScriptPanel />
     </main>
   );
 }
@@ -461,6 +461,7 @@ function TransferLayout() {
   const [loaderVisible, setLoaderVisible] = useState(true);
   const overlayRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const hasEnteredRouteRef = useRef(false);
 
   const transitionTo = useCallback(
     (to: string) => {
@@ -515,18 +516,31 @@ function TransferLayout() {
   useLayoutEffect(() => {
     const page = contentRef.current?.querySelector<HTMLElement>("[data-route-page]");
     if (!page) return;
+    const isInitialEntry = !hasEnteredRouteRef.current;
+    hasEnteredRouteRef.current = true;
     const context = gsap.context(() => {
       const mm = gsap.matchMedia();
       mm.add("(prefers-reduced-motion: no-preference)", () => {
         const entrance = gsap.timeline({ defaults: { ease: "power3.out" } });
-        entrance
-          .fromTo(page, { autoAlpha: 0.7, y: 8 }, { autoAlpha: 1, y: 0, duration: 0.3 })
-          .fromTo(
-            page.querySelectorAll("[data-reveal]"),
-            { autoAlpha: 0.75, y: 10 },
-            { autoAlpha: 1, y: 0, duration: 0.32, stagger: 0.035 },
-            "-=0.2",
-          );
+        if (isInitialEntry) {
+          entrance
+            .fromTo(page, { autoAlpha: 0.7, y: 8 }, { autoAlpha: 1, y: 0, duration: 0.3 })
+            .fromTo(
+              page.querySelectorAll("[data-reveal]"),
+              { autoAlpha: 0.75, y: 10 },
+              { autoAlpha: 1, y: 0, duration: 0.32, stagger: 0.035 },
+              "-=0.2",
+            );
+        } else {
+          entrance
+            .fromTo(page, { y: 3 }, { y: 0, duration: 0.14, clearProps: "transform" })
+            .fromTo(
+              page.querySelectorAll("[data-reveal]"),
+              { y: 3 },
+              { y: 0, duration: 0.15, stagger: 0.012, clearProps: "transform" },
+              "<",
+            );
+        }
         const breathing = gsap.to(page.querySelectorAll("[data-breathe]"), {
           scale: 1.012,
           autoAlpha: 0.9,
