@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>One Transfer</title>
+    <meta name="description" content="用光传递数据。" />
+    <meta name="theme-color" content="#f5f5f7" />
+    <link rel="icon" href="data:," />
+    <style>
+      html, body, #root { min-height: 100%; margin: 0; background: #f5f5f7; }
+      .boot-loader {
+        position: fixed; inset: 0; display: grid; place-items: center;
+        color: #1d1d1f; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+      }
+      .boot-loader div { display: grid; gap: 12px; text-align: center; }
+      .boot-loader strong { font-size: clamp(32px, 7vw, 54px); letter-spacing: -.05em; }
+      .boot-loader span { color: #6e6e73; font-size: 14px; }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div class="boot-loader" role="status" aria-label="One Transfer 加载中">
+        <div><strong>One Transfer</strong><span>用光传递数据</span></div>
+      </div>
+    </div>
+    <script type="module" src="./src/main.tsx"></script>
+  </body>
+</html>
