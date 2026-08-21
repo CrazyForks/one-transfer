@@ -19,7 +19,15 @@ import { createDecodeWorker } from "./worker-factory";
 import { NoSignalHintTimer } from "../shared/no-signal";
 import { DecodeWorkerPool } from "../shared/worker-pool";
 import { isSnippet, snippetText } from "../shared/snippet";
-import { fnv1a, parseFrame, streamIdentity, unpackFile, verifyFile } from "../shared/protocol";
+import {
+  HEADER_LEN,
+  fnv1a,
+  parseFrame,
+  streamIdentity,
+  unpackFile,
+  verifyFile,
+} from "../shared/protocol";
+import { maximumFileBytes } from "../shared/frame-capacity";
 import { NO_SIGNAL_HINT_FRAME_BYTES, NO_SIGNAL_HINT_TX_FPS } from "../shared/send-settings";
 import { statusLine } from "../shared/status-line";
 import { requestScreenWakeLock } from "../shared/wake-lock";
@@ -386,7 +394,8 @@ function onDecoded(bytes: Uint8Array) {
     const ok = fnv1a(payload) === header.payloadFnv;
     finishing = true;
     finishedStreamKeys.add(identity);
-    void finish(payload, ok, seconds);
+    const maxFileBytes = maximumFileBytes(header.blockLen + HEADER_LEN);
+    void finish(payload, ok, seconds, maxFileBytes);
   }
 }
 
@@ -428,13 +437,18 @@ function goodputKbs(elapsed: number): number {
   );
 }
 
-async function finish(container: Uint8Array, hashOk: boolean, seconds: number) {
+async function finish(
+  container: Uint8Array,
+  hashOk: boolean,
+  seconds: number,
+  maxFileBytes: number,
+) {
   bar.style.width = "100%";
   progressEl.setAttribute("aria-valuenow", "100");
   etaLabel.textContent = `共 ${formatDuration(seconds)}`;
   try {
     if (!hashOk) throw new Error("光学数据校验失败。");
-    const file = await unpackFile(container);
+    const file = await unpackFile(container, maxFileBytes);
     if (!(await verifyFile(file))) throw new Error("文件未通过 SHA-256 校验。");
 
     // The container carries its own media type, so the receiver never has to be

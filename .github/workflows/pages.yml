@@ -1,16 +1,19 @@
-name: Deploy site to GitHub Pages
+name: Build and deploy site
 
 on:
+  pull_request:
+    branches: [main]
   push:
     branches: [main]
   workflow_dispatch:
 
 concurrency:
-  group: github-pages
+  group: site-deploy-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   build:
+    name: Test and build
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -36,7 +39,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Configure GitHub Pages
-        id: pages
+        if: github.event_name != 'pull_request'
         uses: actions/configure-pages@v5
 
       - name: Test
@@ -45,12 +48,15 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Upload GitHub Pages artifact
+      - name: Upload site artifact
+        if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v4
         with:
           path: dist
 
-  deploy:
+  github-pages:
+    name: Deploy to GitHub Pages
+    if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -64,3 +70,50 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  cloudflare-pages:
+    name: Deploy to Cloudflare Pages
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      HUSKY: 0
+      TZ: Asia/Shanghai
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download site artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: github-pages
+          path: .site-artifact
+
+      - name: Extract site artifact
+        run: mkdir dist && tar -xf .site-artifact/artifact.tar -C dist
+
+      - name: Deploy with Wrangler
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: >-
+          pnpm exec wrangler pages deploy dist
+          --project-name=one-transfer
+          --branch=main
+          --commit-hash=${{ github.sha }}

@@ -453,7 +453,7 @@ function RestoreScriptPanel() {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch(new URL("restore-base64.bat", document.baseURI), { signal: controller.signal })
+    fetch(new URL("one-transfer-restore.bat", document.baseURI), { signal: controller.signal })
       .then((response) => {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return response.text();
@@ -486,8 +486,8 @@ function RestoreScriptPanel() {
       <CardContent className="grid justify-items-center gap-4 p-6 text-center">
         <div className="grid justify-items-center gap-1">
           <span className="text-[11px] font-bold tracking-wider text-blue-600">WINDOWS 接收端 · 首次使用</span>
-          <strong>Windows 文件还原脚本</strong>
-          <span className="text-sm text-zinc-500">下载脚本，或复制下方源码并保存为 restore-base64.bat。</span>
+          <strong>One Transfer 通用还原脚本</strong>
+          <span className="text-sm text-zinc-500">下载脚本，或复制下方源码并保存为 one-transfer-restore.bat；兼容 V1/V2。</span>
         </div>
         <textarea
           ref={textareaRef}
@@ -495,10 +495,10 @@ function RestoreScriptPanel() {
           readOnly
           rows={12}
           spellCheck={false}
-          aria-label="restore-base64.bat 脚本源码"
+          aria-label="one-transfer-restore.bat 脚本源码"
           onFocus={(event) => event.currentTarget.select()}
           className="w-full resize-y rounded-xl border border-black/10 bg-zinc-50 p-4 text-left font-mono text-xs leading-relaxed text-zinc-700 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
-          placeholder="正在加载 restore-base64.bat…"
+          placeholder="正在加载 one-transfer-restore.bat…"
         />
         {error ? <span className="text-sm font-medium text-red-600">{error}</span> : null}
         <div className="flex flex-col items-center justify-center gap-2 sm:flex-row">
@@ -506,7 +506,7 @@ function RestoreScriptPanel() {
             <ClipboardPaste />{copyLabel}
           </Button>
           <Button asChild>
-            <a href="./restore-base64.bat" download="restore-base64.bat"><Download />下载还原脚本</a>
+            <a href="./one-transfer-restore.bat" download="one-transfer-restore.bat"><Download />下载还原脚本</a>
           </Button>
         </div>
       </CardContent>
@@ -519,8 +519,9 @@ function ClipboardView() {
     <main data-route-page data-view="clipboard" className={viewShell}>
       <section data-reveal className="relative z-10 mb-4 w-full text-center">
         <h1 className={headingClass}>通过文本剪贴板传文件</h1>
-        <p data-breathe className="mt-3.5 text-base text-zinc-500">把文件编码为 Base64 文本复制，再在 Windows 接收端还原。</p>
+        <p data-breathe className="mt-3.5 text-base text-zinc-500">压缩并编码为高密度文本，再在 Windows 接收端校验还原。</p>
       </section>
+      <div data-reveal className="relative z-10 w-full"><ClipboardCodecTabs /></div>
       <div className="status-line relative z-10 min-h-5 w-full text-center font-mono text-xs text-zinc-500" id="clipboard-status" aria-live="polite">请在发送端选择要传递的文件</div>
       <FileSelectPanel
         inputId="clipboard-file"
@@ -529,10 +530,38 @@ function ClipboardView() {
       />
       <div data-reveal className="relative z-10 flex w-full flex-col items-center gap-3.5 text-center">
         <Button id="copy-transfer" type="button" disabled>复制文件数据到剪贴板</Button>
-        <span className="text-sm text-zinc-500">只复制 Base64 文件数据，不在页面显示；文本大小约为原文件的 1.33 倍。</span>
+        <span className="text-sm text-zinc-500">默认 Base32768 适合 UTF-16 剪贴板；遇到乱码或截断时切换 ASCII 兼容。</span>
       </div>
       <RestoreScriptPanel />
     </main>
+  );
+}
+
+function ClipboardCodecTabs() {
+  const [value, setValue] = useState("b32768");
+
+  const changeCodec = (nextValue: string) => {
+    setValue(nextValue);
+    const input = document.querySelector<HTMLInputElement>(
+      `input[name="clipboard-codec"][value="${nextValue}"]`,
+    );
+    if (input) {
+      input.checked = true;
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  };
+
+  return (
+    <>
+      <Tabs value={value} onValueChange={changeCodec}>
+        <TabsList className="w-full">
+          <TabsTrigger value="b32768" className="data-[state=active]:bg-white">高密度 Unicode</TabsTrigger>
+          <TabsTrigger value="base91" className="data-[state=active]:bg-white">ASCII 兼容</TabsTrigger>
+        </TabsList>
+      </Tabs>
+      <input hidden type="radio" name="clipboard-codec" value="b32768" defaultChecked />
+      <input hidden type="radio" name="clipboard-codec" value="base91" />
+    </>
   );
 }
 

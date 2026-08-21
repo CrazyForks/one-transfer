@@ -12,17 +12,22 @@
 //  12  u32  totalLen    protected file-container length in bytes
 //  16  u32  payloadFnv  FNV-1a of the whole container — verified on completion
 
+import { formatBytes } from "./format";
+
 export const HEADER_LEN = 20;
+/** Default limit for clipboard transfers and callers without an optical profile. */
 export const MAX_FILE_BYTES = 64 * 1024 * 1024;
 /**
- * One place for the number, so the picker label, the rejection message and
- * packFile()'s own error can't drift apart. The sender renders the label from
- * this value at runtime.
+ * One place for the clipboard/default number, so its picker, rejection message
+ * and decoder cannot drift apart. Optical transfers pass a profile-derived
+ * limit to packFile() and unpackFile().
  *
  * README.md describes the same limit in prose and must change with this value.
  */
 export const MAX_FILE_LABEL = `${MAX_FILE_BYTES / 1024 / 1024} MB`;
-const FILE_HEADER_LEN = 49;
+export const FILE_CONTAINER_HEADER_LEN = 49;
+export const MAX_FILE_NAME_BYTES = 0xffff;
+export const MAX_MEDIA_TYPE_BYTES = 0xffff;
 const MAGIC0 = 0xd1;
 const MAGIC1 = 0x0c;
 const FILE_MAGIC = new Uint8Array([0x44, 0x43, 0x46, 0x32]); // DCF2
@@ -65,7 +70,7 @@ async function gzipAsync(bytes: Uint8Array): Promise<Uint8Array> {
  * The gzip trailer's declared size is attacker-controlled — it arrives over the
  * optical channel like everything else — so it is a hint, never a bound. This
  * counts bytes as they come off the stream and aborts the moment they exceed
- * `maxBytes`, which the caller has already clamped to MAX_FILE_BYTES. Without
+ * `maxBytes`, which the caller has already clamped to the active file limit. Without
  * this an 80 KB stream could claim to be small and inflate to gigabytes.
  */
 async function gunzipAsync(bytes: Uint8Array, maxBytes: number): Promise<Uint8Array> {
@@ -164,15 +169,19 @@ export async function packFile(
   name: string,
   type: string,
   bytes: Uint8Array,
+  maxFileBytes = MAX_FILE_BYTES,
 ): Promise<PackedOpticalFile> {
+  if (!Number.isSafeInteger(maxFileBytes) || maxFileBytes <= 0 || maxFileBytes > 0xffffffff) {
+    throw new RangeError("文件大小上限无效。");
+  }
   if (bytes.length === 0) throw new Error("请选择非空文件。");
-  if (bytes.length > MAX_FILE_BYTES) {
-    throw new Error(`文件不能超过 ${MAX_FILE_LABEL}。`);
+  if (bytes.length > maxFileBytes) {
+    throw new Error(`文件不能超过当前传输配置上限 ${formatBytes(maxFileBytes)}。`);
   }
 
   const nameBytes = textEncoder.encode(safeFileName(name));
   const typeBytes = textEncoder.encode(type || "application/octet-stream");
-  if (nameBytes.length > 0xffff || typeBytes.length > 0xffff) {
+  if (nameBytes.length > MAX_FILE_NAME_BYTES || typeBytes.length > MAX_MEDIA_TYPE_BYTES) {
     throw new Error("文件名或媒体类型过长。");
   }
 
@@ -186,7 +195,7 @@ export async function packFile(
   const transmitted = useGzip ? compressed : bytes;
   const compression: CompressionMode = useGzip ? "gzip" : "none";
   const out = new Uint8Array(
-    FILE_HEADER_LEN + nameBytes.length + typeBytes.length + transmitted.length,
+    FILE_CONTAINER_HEADER_LEN + nameBytes.length + typeBytes.length + transmitted.length,
   );
   const view = new DataView(out.buffer);
   out.set(FILE_MAGIC, 0);
@@ -196,9 +205,9 @@ export async function packFile(
   view.setUint32(9, bytes.length, true);
   view.setUint32(13, transmitted.length, true);
   out.set(sha256, 17);
-  out.set(nameBytes, FILE_HEADER_LEN);
-  out.set(typeBytes, FILE_HEADER_LEN + nameBytes.length);
-  out.set(transmitted, FILE_HEADER_LEN + nameBytes.length + typeBytes.length);
+  out.set(nameBytes, FILE_CONTAINER_HEADER_LEN);
+  out.set(typeBytes, FILE_CONTAINER_HEADER_LEN + nameBytes.length);
+  out.set(transmitted, FILE_CONTAINER_HEADER_LEN + nameBytes.length + typeBytes.length);
   return {
     container: out,
     compression,
@@ -207,8 +216,14 @@ export async function packFile(
   };
 }
 
-export async function unpackFile(container: Uint8Array): Promise<OpticalFile> {
-  if (container.length < FILE_HEADER_LEN) throw new Error("接收到的文件头不完整。");
+export async function unpackFile(
+  container: Uint8Array,
+  maxFileBytes = MAX_FILE_BYTES,
+): Promise<OpticalFile> {
+  if (!Number.isSafeInteger(maxFileBytes) || maxFileBytes <= 0 || maxFileBytes > 0xffffffff) {
+    throw new RangeError("文件大小上限无效。");
+  }
+  if (container.length < FILE_CONTAINER_HEADER_LEN) throw new Error("接收到的文件头不完整。");
   for (let i = 0; i < FILE_MAGIC.length; i++) {
     if (container[i] !== FILE_MAGIC[i]) throw new Error("接收到的文件头无效。");
   }
@@ -221,12 +236,12 @@ export async function unpackFile(container: Uint8Array): Promise<OpticalFile> {
   const typeLength = view.getUint16(7, true);
   const fileLength = view.getUint32(9, true);
   const transmittedLength = view.getUint32(13, true);
-  const dataOffset = FILE_HEADER_LEN + nameLength + typeLength;
+  const dataOffset = FILE_CONTAINER_HEADER_LEN + nameLength + typeLength;
   if (
     fileLength === 0 ||
-    fileLength > MAX_FILE_BYTES ||
+    fileLength > maxFileBytes ||
     transmittedLength === 0 ||
-    transmittedLength > MAX_FILE_BYTES ||
+    transmittedLength > maxFileBytes ||
     dataOffset + transmittedLength !== container.length
   ) {
     throw new Error("文件长度与文件头不一致。");
@@ -251,10 +266,12 @@ export async function unpackFile(container: Uint8Array): Promise<OpticalFile> {
 
   return {
     name: safeFileName(
-      textDecoder.decode(container.subarray(FILE_HEADER_LEN, FILE_HEADER_LEN + nameLength)),
+      textDecoder.decode(
+        container.subarray(FILE_CONTAINER_HEADER_LEN, FILE_CONTAINER_HEADER_LEN + nameLength),
+      ),
     ),
     type:
-      textDecoder.decode(container.subarray(FILE_HEADER_LEN + nameLength, dataOffset)) ||
+      textDecoder.decode(container.subarray(FILE_CONTAINER_HEADER_LEN + nameLength, dataOffset)) ||
       "application/octet-stream",
     sha256: container.slice(17, 49),
     bytes,
@@ -308,6 +325,15 @@ export function parseFrame(
   };
   if (header.k === 0 || header.blockLen === 0 || header.totalLen === 0) return null;
   if (bytes.length !== HEADER_LEN + header.blockLen) return null;
+  // k must be the exact ceil(totalLen / blockLen). Besides rejecting mixed or
+  // corrupt frames, this prevents a tiny QR header from requesting a huge
+  // receiver allocation through an unrelated u32 totalLen.
+  if (
+    header.totalLen > header.k * header.blockLen ||
+    header.totalLen <= (header.k - 1) * header.blockLen
+  ) {
+    return null;
+  }
   return { header, block: bytes.subarray(HEADER_LEN) };
 }
 

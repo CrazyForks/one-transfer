@@ -32,6 +32,18 @@ test("SHA-256 verification rejects changed file bytes", async () => {
   assert.equal(await verifyFile(recovered), false);
 });
 
+test("optical callers can supply a profile-derived file limit", async () => {
+  const source = new Uint8Array([1, 2, 3, 4, 5]);
+  await assert.rejects(
+    packFile("profile.bin", "application/octet-stream", source, 4),
+    /当前传输配置上限/,
+  );
+
+  const packed = await packFile("profile.bin", "application/octet-stream", source, 5);
+  await assert.rejects(unpackFile(packed.container, 4), /文件长度与文件头不一致/);
+  assert.deepEqual((await unpackFile(packed.container, 5)).bytes, source);
+});
+
 test("compressible files use gzip and recover exactly", async () => {
   const source = new TextEncoder().encode("one transfer\n".repeat(4_000));
   const packed = await packFile("notes.txt", "text/plain", source);
@@ -89,14 +101,14 @@ test("the frame header is byte-for-byte what the wire expects", () => {
       seq: 0x01020304,
       k: 0x0111,
       blockLen: 6,
-      totalLen: 0x00fedcba,
+      totalLen: 0x00000666,
       payloadFnv: 0x89abcdef,
     },
     new Uint8Array([1, 2, 3, 4, 5, 6]),
   );
   assert.equal(
     [...frame].map((b) => b.toString(16).padStart(2, "0")).join(" "),
-    "d1 0c ef be 04 03 02 01 11 01 06 00 ba dc fe 00 ef cd ab 89 01 02 03 04 05 06",
+    "d1 0c ef be 04 03 02 01 11 01 06 00 66 06 00 00 ef cd ab 89 01 02 03 04 05 06",
   );
   assert.equal(frame.length, HEADER_LEN + 6);
 
@@ -107,7 +119,7 @@ test("the frame header is byte-for-byte what the wire expects", () => {
     seq: 0x01020304,
     k: 0x0111,
     blockLen: 6,
-    totalLen: 0x00fedcba,
+    totalLen: 0x00000666,
     payloadFnv: 0x89abcdef,
   });
   assert.deepEqual(parsed.block, new Uint8Array([1, 2, 3, 4, 5, 6]));
@@ -231,4 +243,12 @@ test("frames that are not ours, or not self-consistent, are rejected", () => {
   const zeroK = good.slice();
   new DataView(zeroK.buffer).setUint16(8, 0, true);
   assert.equal(parseFrame(zeroK), null, "k=0 would divide by zero downstream");
+
+  const oversizedTotal = good.slice();
+  new DataView(oversizedTotal.buffer).setUint32(12, 13, true);
+  assert.equal(parseFrame(oversizedTotal), null, "totalLen exceeds k × blockLen");
+
+  const undersizedTotal = good.slice();
+  new DataView(undersizedTotal.buffer).setUint32(12, 8, true);
+  assert.equal(parseFrame(undersizedTotal), null, "k is not ceil(totalLen / blockLen)");
 });

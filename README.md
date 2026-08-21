@@ -19,7 +19,7 @@ Repository: [github.com/zhihui-hu/one-transfer](https://github.com/zhihui-hu/one
 ## ✨ Highlights
 
 - **Optical transfer:** send files and text as LT fountain-coded animated QR frames without a connection between endpoints.
-- **Files over text:** encode a file as a versioned `ONE_TRANSFER_V1` Base64 record and restore it on Windows.
+- **Files over text:** gzip when useful, then encode as `ONE_TRANSFER_V2` Base32768 or Base91 and restore it on Windows.
 - **Frame-loss tolerance:** recover from any sufficient set of distinct frames without per-frame retransmission.
 - **Layered integrity:** validate container structure, lengths, FNV-1a, gzip bounds, and SHA-256.
 - **Local processing:** business files never upload to the application server.
@@ -61,13 +61,88 @@ If Cloudflare does not detect the project automatically, use:
 | Build output directory | `dist` |
 | Node.js | `24` or newer |
 
+## User Guide
+
+### Transfer a File through a Text-only Clipboard
+
+Use this direction when the source side can copy text, the Windows side can paste text, but the channel
+does not carry a file object.
+
+1. Open `#/clipboard` on the source device.
+2. On the Windows receiver, download `one-transfer-restore.bat` once. Put the script in the directory
+   where restored files should be written. The complete source is also visible on the page when direct
+   download is inconvenient.
+3. Keep **High-density Unicode** selected first. It uses Base32768 and is normally the smallest choice
+   for Windows/RDP-style UTF-16 clipboard paths.
+4. Select a file. The browser reads it locally, computes SHA-256, tries gzip when appropriate, and shows:
+   original size, compressed size, encoded character count, and the estimated reduction from V1 Base64.
+5. Click **Copy file data to clipboard**, then switch to the Windows session and wait for clipboard text
+   synchronization to finish.
+6. Double-click `one-transfer-restore.bat`. The file is written beside the script only after protocol,
+   filename, decoded length, gzip bound, and SHA-256 validation all succeed.
+7. If the target already exists, move or rename it first. The restorer never overwrites an existing path.
+
+If Windows reports an unrecognized Base32768 character, padding failure, truncation, or SHA-256 failure,
+return to the source page, choose **ASCII compatible**, select the same file again, and copy the new Base91
+record. Base91 is larger but survives systems that normalize, reject, or re-encode high Unicode.
+
+| Mode | Prefer when | Expected encoding overhead before protocol fields |
+|---|---|---:|
+| High-density Unicode / Base32768 | Clipboard preserves Unicode; Windows/RDP text path | about 6.67% in UTF-16 |
+| ASCII compatible / Base91 | Channel accepts printable ASCII only or Unicode was changed | about 23% |
+
+The 64 MiB application limit is not a promise that every clipboard channel accepts 64 MiB of text.
+Remote-desktop products, browser implementations, gateways, and policy layers may impose smaller limits.
+V2 detects a truncated record; it cannot increase the underlying channel capacity.
+
+### Transfer a File or Text with Light
+
+1. Open `#/send`, choose **File** or **Text**, and select the content.
+2. One Transfer inspects the sending computer and selects the highest Stable/Balanced/Fast preset it can
+   reasonably render. The file limit updates with that preset. Lower the slider if the receiving image is
+   small, blurred, compressed, or tearing.
+3. Keep the four animated QR codes visible. The sender progress bar measures one recommended fountain
+   broadcast round; it is not a receiver acknowledgement.
+4. On the receiving device, open `#/receive` and choose **Scan computer screen** or **Use camera**.
+5. Keep the QR grid inside the capture. The receiver accepts distinct symbols in any order and tolerates
+   missing or repeated frames. The receiver progress bar is the authoritative recovery state.
+6. Save the file or copy the recovered text only after the page reports successful integrity validation.
+
+### Mac File or Directory Helper
+
+The workspace helper creates the same V2 record and can ZIP a directory before copying it:
+
+```bash
+../deploy/add-transfer.sh /path/to/file-or-directory
+```
+
+It defaults to Base32768. Use the ASCII fallback when necessary:
+
+```bash
+ONE_TRANSFER_CODEC=base91 ../deploy/add-transfer.sh /path/to/file-or-directory
+```
+
+The helper requires `python3`, `pbcopy`, and, for directories, `zip`. Directory contents are archived
+under one top-level directory so the Windows restorer can validate and move the recovered tree safely.
+
+### Common Problems
+
+| Symptom | Action |
+|---|---|
+| Base32768 character/padding error | Re-copy with **ASCII compatible** selected |
+| SHA-256 or length failure | The text was truncated or changed; copy the whole record again |
+| Target already exists | Move or rename the existing file; automatic overwrite is intentionally disabled |
+| Clipboard copy button fails | Grant clipboard permission or use a browser that permits clipboard writes in HTTPS |
+| QR receiver shows no signal | Lower the speed slider, enlarge the QR window, improve focus, or capture the window directly |
+| QR progress is slow but still moving | Keep the stream visible; dropped frames reduce speed, not correctness |
+
 ---
 
 ## Abstract
 
 One Transfer defines data representations for two asymmetric channel classes. A text-only channel
-cannot carry file objects, so the system encodes file bytes, a UTF-8 filename, and type information as a
-versioned Base64 record and restores it on Windows. A visible-screen channel has no reliable feedback
+cannot carry file objects, so the system compresses file bytes when useful, encodes them as UTF-16-efficient
+Base32768 text with an ASCII Base91 fallback, and restores the versioned record on Windows. A visible-screen channel has no reliable feedback
 path, so the system packages files or text in an integrity-protected container, encodes it as an endless
 LT fountain stream, renders animated QR codes, and recovers them through a camera or screen capture.
 
@@ -75,7 +150,7 @@ The implementation is a single-entry Vite SPA. File contents are processed local
 are never uploaded to the application server. This document specifies the system model, protocols,
 algorithms, security boundary, performance model, implementation, and validation strategy.
 
-**Keywords:** text channel; Base64; animated QR; LT fountain code; optical channel; React; Vite
+**Keywords:** text channel; Base32768; Base91; animated QR; LT fountain code; optical channel; React; Vite
 
 ---
 
@@ -138,7 +213,7 @@ flowchart LR
   end
 
   subgraph GROUP_B[Windows receiver / optical sender]
-    B[restore-base64.bat]
+    B[one-transfer-restore.bat]
     F[File or text]
     S[One Transfer QR sender]
   end
@@ -147,7 +222,7 @@ flowchart LR
     R[Browser receiver]
   end
 
-  A -->|ONE_TRANSFER_V1 Base64 text| C[Plain-text clipboard]
+  A -->|ONE_TRANSFER_V2 high-density text| C[Plain-text clipboard]
   C --> B
   B -->|restore| F
 
@@ -158,7 +233,7 @@ flowchart LR
 
 | Direction | Payload | Physical channel | Encoding | Receiver |
 |---|---|---|---|---|
-| Text sender → Windows receiver | File | Clipboard or another text channel | Base64 text protocol | Windows BAT + PowerShell |
+| Text sender → Windows receiver | File | Clipboard or another text channel | gzip + Base32768/Base91 + SHA-256 | Windows BAT + PowerShell/C# |
 | Optical sender → optical receiver | File | Screen → camera/capture | Container + LT code + QR | Browser + ZXing WASM |
 | Optical sender → optical receiver | Text | Screen → camera/capture | UTF-8 container + LT code + QR | Browser display and copy |
 
@@ -178,6 +253,7 @@ channel is text-only.
 - GSAP 3 for loading, route, Tabs, and ambient breathing motion
 - `qrcode` for QR generation
 - `zxing-wasm` in Web Workers for QR decoding
+- `base32768` for UTF-16-efficient clipboard text and an in-project Base91 fallback
 - `vite-plugin-pwa` for offline precaching
 - Web Crypto, Compression Streams, Media Capture, Canvas, and Clipboard APIs
 
@@ -205,7 +281,7 @@ breathing motion. All motion is disabled when `prefers-reduced-motion` is enable
 ### 3.3 Offline Operation
 
 The production service worker precaches the SPA, JavaScript, CSS, ZXing WASM, decoder worker, and
-`restore-base64.bat`. Once loaded, the application can continue operating without a network. A strictly
+`one-transfer-restore.bat`. Once loaded, the application can continue operating without a network. A strictly
 isolated deployment should be cached before entering the boundary or hosted on an approved internal
 static service.
 
@@ -219,53 +295,60 @@ On `#/clipboard`, the external sender:
 
 1. Validates that the selected filename can be created on Windows.
 2. Reads bytes locally through `File.arrayBuffer()`.
-3. Base64-encodes the UTF-8 filename and raw payload.
-4. Constructs the `ONE_TRANSFER_V1` record and copies it without rendering the Base64 payload on page.
-5. Uses a temporary text area with `execCommand` when the modern Clipboard API is unavailable.
+3. Computes SHA-256 and tries gzip for data that is not already compressed.
+4. Encodes the transmitted bytes as Base32768 by default, or Base91 in ASCII compatibility mode.
+5. Constructs `ONE_TRANSFER_V2` and writes the text to the clipboard without rendering the payload.
+6. Uses a temporary text area with `execCommand` when the modern Clipboard API is unavailable.
 
-For a file of `N` bytes, Base64 requires approximately:
-
-```text
-B = 4 × ceil(N / 3)
-```
-
-The resulting text is therefore about 1.33 times the original size before protocol and filename
-overhead. The practical limit is determined by the browser and the capacity of the concrete text channel.
+Base32768 places 15 input bits in one safe BMP character. In a UTF-16 text channel this is 93.75%
+efficient, or approximately 6.67% overhead, and uses about 40% as many characters as Base64. Base91
+uses printable ASCII with about 23% overhead and is the fallback for channels that alter high Unicode.
+The UI reports original and compressed size, final character count, and the approximate reduction from
+the V1 Base64 representation.
 
 ### 4.2 Clipboard Wire Format
 
-The record is a single text line split into at most four fields:
+The V2 record is one text value split into eight fields; the eighth field consumes the remainder so a
+Base91 payload may contain `|` safely:
 
 ```text
-ONE_TRANSFER_V1|<itemType>|<base64(UTF-8 name)>|<base64(payload)>
+ONE_TRANSFER_V2|<itemType>|<codec>|<compression>|<originalSize>|<sha256>|<percentEncodedName>|<payload>
 ```
 
 | Field | Meaning |
 |---|---|
-| `ONE_TRANSFER_V1` | Protocol magic and version |
+| `ONE_TRANSFER_V2` | Protocol magic and version |
 | `itemType` | `file` or `directory` |
-| name | Base64-encoded UTF-8 basename |
-| payload | Base64-encoded file bytes or directory ZIP |
+| `codec` | `b32768` or `base91` |
+| `compression` | `none` or `gzip` |
+| `originalSize` | Exact decoded byte count, bounded to 64 MiB |
+| `sha256` | Lowercase SHA-256 of the original bytes |
+| name | Percent-encoded UTF-8 basename |
+| payload | Encoded original bytes, gzip stream, or directory ZIP |
 
 The web UI handles one file per operation. On a Mac sender, a directory can be prepared with
-`../deploy/add-transfer.sh <directory>`; the helper creates a ZIP and emits the same wire format.
+`../deploy/add-transfer.sh <directory>`; the helper creates a ZIP and emits V2 Base32768. Set
+`ONE_TRANSFER_CODEC=base91` for ASCII compatibility. The Windows receiver still accepts legacy
+`ONE_TRANSFER_V1` Base64 records generated before this upgrade.
 
 ### 4.3 Windows Restoration
 
-The Windows receiver can download `restore-base64.bat` from `#/clipboard`, or copy the complete script
+The Windows receiver can download `one-transfer-restore.bat` from `#/clipboard`, or copy the complete script
 source displayed on the page and save it under that filename. Place it in the desired destination
 directory. On each run, the script:
 
 1. Checks for Windows PowerShell.
 2. reads clipboard text using `Get-Clipboard -Raw`;
-3. validates protocol magic, field count, item type, and filename;
-4. decodes the Base64 filename and payload;
-5. refuses to overwrite an existing target;
-6. writes a file directly or expands a directory ZIP in randomized temporary paths;
-7. prints an MD5 value, cleans temporary data, and pauses so the result remains visible.
+3. identifies V1 or V2 and validates every field before allocating output;
+4. decodes Base32768/Base91 through an embedded compiled C# codec, or Base64 for V1 compatibility;
+5. inflates gzip with the declared original size as a hard output ceiling;
+6. verifies exact byte length and SHA-256 before writing anything;
+7. refuses to overwrite an existing target;
+8. writes a file directly or expands a directory ZIP in randomized temporary paths;
+9. prints SHA-256, cleans temporary data, and pauses so the result remains visible.
 
 Clipboard text is never evaluated as a command. The decoded filename is used only as a validated path
-argument.
+argument. Clipboard payload bytes are treated as untrusted until length and digest verification finish.
 
 ### 4.4 Inbound Sequence
 
@@ -275,14 +358,70 @@ sequenceDiagram
   participant C as Text clipboard
   participant W as Windows receiver
 
-  W->>W: Download restore-base64.bat once
+  W->>W: Download one-transfer-restore.bat once
   E->>E: Select and read a local file
-  E->>E: Encode ONE_TRANSFER_V1 Base64 text
+  E->>E: gzip when useful, SHA-256, Base32768/Base91
+  E->>E: Encode ONE_TRANSFER_V2 text
   E->>C: Copy plain text
   C->>W: Synchronize clipboard text
-  W->>W: Run BAT, validate, and decode
-  W->>W: Restore file and display MD5
+  W->>W: Run BAT, decode, decompress, and verify
+  W->>W: Restore file and display SHA-256
 ```
+
+### 4.5 Compression Pipeline and Size Reduction
+
+The clipboard sender performs transformations in this order:
+
+```text
+original bytes
+  ├─ SHA-256(original)
+  └─ optional gzip
+       └─ Base32768 or Base91
+            └─ ONE_TRANSFER_V2 header + encoded payload
+```
+
+The web sender considers gzip only when the item is a file, its size is at least 768 bytes, and its MIME
+type is not known to be already compressed. Even then, gzip is accepted only when:
+
+```text
+gzipSize + 64 < originalSize
+```
+
+The 64-byte margin prevents spending decoder work and protocol complexity for a negligible result.
+Video, ZIP/gzip/7z/RAR/xz/zstd, most JPEG/PNG/WebP-style images, compressed audio, Office Open XML, and
+OpenDocument files skip the trial. BMP, SVG, TIFF, WAV, AIFF, plain text, JSON, source code, CSV, XML,
+and logs remain eligible. The Mac helper calculates gzip and makes the same 64-byte gain decision.
+
+Let `N` be original bytes, `C` the selected transmitted bytes after optional gzip, and `H` the V2 header
+and encoded filename character count. Approximate text lengths are:
+
+```text
+Base32768 characters ≈ ceil(8 × C / 15) + H
+Base91 characters    ≈ 1.23 × C + H
+legacy Base64        ≈ 4 × ceil(N / 3) + legacyHeader
+```
+
+Base32768 is smaller by character count and by UTF-16 storage. If an intermediary converts everything
+to UTF-8 and applies a byte quota, its BMP characters normally occupy three UTF-8 bytes; Base91 may then
+be the smaller wire representation despite having more visible characters. Use the channel's actual
+limit and behavior, not only the string length shown by the browser.
+
+To minimize the transferred text:
+
+1. Use **High-density Unicode** unless the real channel changes Unicode or is explicitly ASCII-only.
+2. Let One Transfer gzip text-like files automatically; pre-zipping one ordinary text file is usually
+   unnecessary and removes MIME information that helps the UI explain the decision.
+3. Do not repeatedly recompress JPEG, PNG, WebP, MP4, ZIP, 7z, RAR, Office, or other entropy-coded files.
+   They normally cannot shrink further; Base32768 still reduces the text-encoding overhead.
+4. Remove generated caches, build output, debug logs, or other unnecessary content before creating an
+   archive. Compression cannot remove data that is not needed in the first place.
+5. For a directory, use the Mac helper to create one ZIP rather than transferring many files separately.
+6. If the concrete clipboard limit is below the final V2 character count, split the source into smaller
+   files before encoding. V2 currently restores one complete record and does not implement multipart state.
+
+Restoration reverses the pipeline: text decode → bounded gzip expansion → exact length check → SHA-256
+check → write. The script does not trust the gzip trailer or protocol size alone and writes nothing when
+any stage fails.
 
 ---
 
@@ -307,9 +446,11 @@ The fixed little-endian container header is 49 bytes:
 | 17 | 32 | SHA-256 | Digest of original bytes |
 | 49 | variable | Name + type + payload | Container body |
 
-Files are limited to 64 MiB and text snippets to 4 MiB. Compressible data is tested with gzip, while
-JPEG, video, ZIP, Office Open XML, and other precompressed types skip the extra allocation and CPU pass.
-Gzip is selected only when it saves more than 64 bytes.
+The optical file limit is derived from the active preset's bytes per symbol, the 20-byte frame header,
+and the `u16` source-block count: about 90.2 MiB for Stable, 104.9 MiB for Balanced, and 144.3 MiB for
+Fast. Text snippets remain limited to 4 MiB and clipboard files to 64 MiB. Compressible data is tested
+with gzip, while JPEG, video, ZIP, Office Open XML, and other precompressed types skip the extra
+allocation and CPU pass. Gzip is selected only when it saves more than 64 bytes.
 
 The receiver streams decompression and enforces the declared original length as a hard output ceiling;
 it does not trust the gzip trailer as a safe allocation bound.
@@ -426,9 +567,9 @@ receiver. The text limit is 4 MiB. Recovered text is held only in the page and i
 | Optical stream | LT fountain code | Frame loss, duplication, and reordering |
 | Recovered container | FNV-1a | Fast accidental-corruption check |
 | Original content | SHA-256 | Final content verification |
-| Clipboard restore | Base64 decode + displayed MD5 | Truncation detection and manual comparison |
+| Clipboard restore | Declared length + SHA-256 | Reject truncation or mutation before writing |
 
-FNV-1a and MD5 are error-detection aids, not authentication. SHA-256 confirms content equality, but the
+FNV-1a is a fast error-detection aid, not authentication. SHA-256 confirms content equality, but the
 digest and payload arrive through the same unauthenticated channel.
 
 ### 7.2 Defensive Measures
@@ -443,11 +584,11 @@ digest and payload arrive through the same unauthenticated channel.
 
 ### 7.3 Explicit Risks
 
-- Base64 clipboard data and QR frames contain the original information and are not confidential.
+- Encoded clipboard data and QR frames contain the original information and are not confidential.
 - Anyone able to write the clipboard or place a QR stream in view can provide input.
 - The runtime environment, endpoint software, or operating system may audit clipboard and screen activity.
 - Any camera able to see the sender screen can potentially receive the optical stream.
-- Clipboard size limits can truncate large Base64 records.
+- Clipboard size limits can truncate large text records; V2 detects this but cannot raise the limit.
 
 For sensitive material, encrypt the file with an organization-approved tool before transferring it.
 
@@ -457,9 +598,12 @@ For sensitive material, encrypt the file with an organization-approved tool befo
 
 ### 8.1 Clipboard Channel
 
-Base64 adds approximately 33% size overhead. Transfer time is dominated by the remote clipboard
-implementation. Both endpoints must hold the original bytes, encoded text, and decoded result, so the
-practical limit is lower than the browser's theoretical memory ceiling.
+For uncompressed bytes, Base32768 adds approximately 6.67% in a UTF-16 channel and emits about 0.533
+characters per input byte. Base91 adds about 23% but is printable ASCII. Base32768 can be worse when an
+intermediate service charges UTF-8 bytes rather than Unicode characters or UTF-16 code units, which is
+why V2 exposes both modes. Gzip is attempted first and often dominates the encoding difference for
+text, JSON, source code, and logs. Both endpoints still hold original, transmitted, and decoded data,
+so the practical limit remains lower than the browser's theoretical memory ceiling.
 
 ### 8.2 Optical Channel
 
@@ -534,7 +678,7 @@ one-transfer/
 ```
 
 `../deploy/add-transfer.sh` is a workspace-level Mac helper and is not part of the SPA build. It shares
-the `ONE_TRANSFER_V1` protocol with the browser implementation.
+the `ONE_TRANSFER_V2` Base32768/Base91 protocol with the browser implementation.
 
 ---
 
@@ -566,8 +710,8 @@ The development certificate is self-signed and must be explicitly accepted on ea
 
 ### 10.3 Cloudflare Pages
 
-The `deploy-wrangler.yml` GitHub workflow tests and builds every pull request. A push to `main` or a
-manual dispatch deploys `dist/` with Wrangler. Configure these repository secrets:
+The `cloudflare-pages` job in `pages.yml` reuses the tested site artifact. A push to `main` or a manual
+dispatch deploys `dist/` with Wrangler. Configure these repository secrets:
 
 - `CLOUDFLARE_API_TOKEN`, limited to Cloudflare Pages edit access;
 - `CLOUDFLARE_ACCOUNT_ID`.
@@ -583,8 +727,8 @@ project `one-transfer`.
 
 ### 10.4 GitHub Pages Automation
 
-The independent `pages.yml` workflow tests, builds, uploads the Pages artifact, and deploys it through
-GitHub Actions on a push to `main` or a manual dispatch. In repository **Settings → Pages**, keep
+The same `pages.yml` workflow tests and builds once, then deploys the artifact independently to GitHub
+Pages and Cloudflare Pages. In repository **Settings → Pages**, keep
 **Source** set to **GitHub Actions**.
 
 ### 10.5 Build Version and Update Checks
@@ -632,7 +776,7 @@ runtime checks that static builds cannot replace.
 ## 13. Conclusion
 
 One Transfer combines two permitted but asymmetric channels into a complete restricted-desktop data
-flow. External files enter as Base64 text through a clipboard; internal files and text leave as animated
+flow. External files enter as gzip/Base32768 or Base91 V2 text through a clipboard; internal files and text leave as animated
 fountain-coded QR frames. The text channel solves the text-only inbound constraint, while fountain
 coding makes a lossy, one-way optical channel practical.
 
@@ -652,6 +796,8 @@ the underlying text clipboard and visible-screen channels.
 6. `zxing-wasm`, [Reader API and decoding options](https://github.com/Sec-ant/zxing-wasm#reader-api).
 7. `zxing-cpp`, [WebAssembly performance notes](https://github.com/zxing-cpp/zxing-cpp/tree/master/wrappers/wasm).
 8. `RaptorQR`, [multi-QR optical-transfer implementation and benchmarks](https://github.com/infrost/RaptorQR).
+9. `base32768`, [UTF-16-efficient binary-to-text encoding](https://github.com/qntm/base32768).
+10. M. Botta et al., [“A Survey of Printable Encodings,” Algorithms 18(8), 2025](https://doi.org/10.3390/a18080504).
 
 ## License
 

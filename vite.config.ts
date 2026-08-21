@@ -30,7 +30,7 @@ export default defineConfig({
     basicSsl(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["restore-base64.bat", "app-update-checker.worker.js"],
+      includeAssets: ["one-transfer-restore.bat", "app-update-checker.worker.js"],
       manifest: {
         name: "One Transfer",
         short_name: "One Transfer",

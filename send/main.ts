@@ -18,13 +18,12 @@ import { formatBytes } from "../shared/format";
 import {
   blockLength,
   fitsInOneStream,
+  maximumFileBytes,
   sourceBlockCount,
 } from "../shared/frame-capacity";
 import { LTEncoder } from "../shared/fountain";
 import { MAX_SNIPPET_BYTES, MAX_SNIPPET_LABEL, packSnippet } from "../shared/snippet";
 import {
-  MAX_FILE_BYTES,
-  MAX_FILE_LABEL,
   fnv1a,
   packFile,
   packFrame,
@@ -76,6 +75,18 @@ const initialSpeedProfileIndex = Number(cfgSpeed.dataset.speedIndex);
 let speedProfileIndex = SEND_SPEED_PROFILES[initialSpeedProfileIndex]
   ? initialSpeedProfileIndex
   : DEFAULT_SPEED_PROFILE_INDEX;
+
+function activeSpeedProfile() {
+  return SEND_SPEED_PROFILES[speedProfileIndex] ?? SEND_SPEED_PROFILES[DEFAULT_SPEED_PROFILE_INDEX]!;
+}
+
+function activeMaxFileBytes(): number {
+  return maximumFileBytes(activeSpeedProfile().frameBytes);
+}
+
+function updateFileLimitLabel(): void {
+  filePickerLabel.textContent = `任意文件 · 最大 ${formatBytes(activeMaxFileBytes())}`;
+}
 
 const specsLine = statusLine(specs);
 const setStatus = specsLine.setStatus;
@@ -174,11 +185,19 @@ async function selectFile(): Promise<void> {
     if (file.size === 0) {
       throw new Error(`${file.name} 是空文件，无法发送。`);
     }
-    if (file.size > MAX_FILE_BYTES) {
-      throw new Error(`${file.name} 大小为 ${formatBytes(file.size)}，超过 ${MAX_FILE_LABEL} 限制。`);
+    const maxFileBytes = activeMaxFileBytes();
+    if (file.size > maxFileBytes) {
+      throw new Error(
+        `${file.name} 大小为 ${formatBytes(file.size)}，` +
+          `超过“${activeSpeedProfile().label}”档 ${formatBytes(maxFileBytes)} 限制。`,
+      );
     }
     const bytes = new Uint8Array(await file.arrayBuffer());
-    return { name: file.name, size: file.size, packed: await packFile(file.name, file.type, bytes) };
+    return {
+      name: file.name,
+      size: file.size,
+      packed: await packFile(file.name, file.type, bytes, maxFileBytes),
+    };
   });
 }
 
@@ -195,7 +214,7 @@ async function main() {
   // fewer — so this is a loose guard and packSnippet() remains authoritative.
   snippetText.maxLength = MAX_SNIPPET_BYTES;
   snippetLabel.textContent = `发送文字 · 最大 ${MAX_SNIPPET_LABEL}`;
-  filePickerLabel.textContent = `任意文件 · 最大 ${MAX_FILE_LABEL}`;
+  updateFileLimitLabel();
 
   // Browsers do not fire `change` when the same file is selected twice.
   // Clear only the picker value before opening it; the current QR stream keeps
@@ -218,6 +237,7 @@ const onSpeedChange = (event: Event) => {
   if (Number.isInteger(nextIndex) && SEND_SPEED_PROFILES[nextIndex]) {
     speedProfileIndex = nextIndex;
   }
+  updateFileLimitLabel();
   void startStream();
 };
 
@@ -232,7 +252,7 @@ function scrollStageIntoView() {
 
 async function startStream(revealStage = false) {
   const gen = invalidateStream();
-  const speedProfile = SEND_SPEED_PROFILES[speedProfileIndex] ?? SEND_SPEED_PROFILES[DEFAULT_SPEED_PROFILE_INDEX]!;
+  const speedProfile = activeSpeedProfile();
   if (!selectedFile) {
     setStatus(
       `${speedProfile.label}档 · ${currentMode() === "snippet" ? "输入要发送的文字" : "选择文件开始"}`,
@@ -290,7 +310,13 @@ async function startStream(revealStage = false) {
   const sizeCanvas = () => {
     const dpr = window.devicePixelRatio || 1;
     const total = modules + 2 * MARGIN;
-    const containerWidth = stage.parentElement?.getBoundingClientRect().width ?? window.innerWidth;
+    const parent = stage.parentElement;
+    const parentStyle = parent ? getComputedStyle(parent) : null;
+    const containerWidth = parent
+      ? parent.clientWidth -
+        Number.parseFloat(parentStyle?.paddingLeft || "0") -
+        Number.parseFloat(parentStyle?.paddingRight || "0")
+      : window.innerWidth;
     const stageStyle = getComputedStyle(stage);
     const horizontalChrome =
       Number.parseFloat(stageStyle.paddingLeft) +

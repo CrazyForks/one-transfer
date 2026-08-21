@@ -4,6 +4,7 @@ import { fitQrDisplaySize } from "../shared/display.ts";
 
 test("QR display fits inside its container including padding", () => {
   assert.equal(fitQrDisplaySize(1440, 1000, 720, 900, 40), 680);
+  assert.equal(fitQrDisplaySize(748, 833, 672, 900, 32), 640);
 });
 
 test("QR display still respects the requested and viewport sizes", () => {

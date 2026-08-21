@@ -19,7 +19,7 @@
 ## ✨ 功能特性
 
 - **光学传输：** 文件和文字通过 LT 喷泉码动态二维码发送，无需发送端与接收端建立连接。
-- **文本传文件：** 将文件编码为 `ONE_TRANSFER_V1` Base64 文本，并在 Windows 端恢复。
+- **文本传文件：** 自动 gzip 后编码为 `ONE_TRANSFER_V2` Base32768/Base91 文本，并在 Windows 端校验恢复。
 - **掉帧容错：** 接收任意足量的不重复帧即可恢复，不依赖逐帧重传。
 - **完整性校验：** 文件容器、长度、FNV-1a、gzip 上限和 SHA-256 分层校验。
 - **浏览器本地处理：** 文件不上传到应用服务器。
@@ -61,12 +61,81 @@ pnpm check
 | Build output directory | `dist` |
 | Node.js | `24` 或更高 |
 
+## 使用指南
+
+### 通过纯文本剪贴板传入文件
+
+适用于源端可以复制文字、Windows 接收端可以粘贴文字，但通道不能直接承载文件对象的情况。
+
+1. 在源设备打开 `#/clipboard`。
+2. 在 Windows 接收端首次下载 `one-transfer-restore.bat`，并把脚本放到希望保存文件的目录。
+   如果通道不方便直接下载，页面也会显示完整源码，可以复制并保存为同名 BAT。
+3. 首先保留默认的 **高密度 Unicode**。它使用 Base32768，通常最适合 Windows/RDP 一类
+   UTF-16 文本剪贴板路径，生成字符数也最少。
+4. 选择文件。浏览器只在本地读取文件，计算 SHA-256，按条件尝试 gzip，并显示原始大小、
+   gzip 后大小、最终字符数以及相对 V1 Base64 的预计节省比例。
+5. 点击 **复制文件数据到剪贴板**，切换到 Windows 会话，等待远程剪贴板完成同步。
+6. 双击 `one-transfer-restore.bat`。脚本只有在协议、文件名、解码长度、gzip 上限和 SHA-256
+   全部验证通过后，才会把文件写到脚本所在目录。
+7. 如果目标文件已经存在，请先移动或改名；脚本不会自动覆盖已有文件。
+
+如果 Windows 提示 Base32768 字符无法识别、填充失败、文本被截断或 SHA-256 不一致，请回到
+源页面切换为 **ASCII 兼容**，重新选择同一个文件并复制 Base91 文本。Base91 字符更多，但能
+适应会规范化、过滤或重新编码高位 Unicode 的通道。
+
+| 模式 | 适用情况 | 不含协议字段的理论编码开销 |
+|---|---|---:|
+| 高密度 Unicode / Base32768 | 通道完整保留 Unicode；Windows/RDP 文本路径 | UTF-16 下约 6.67% |
+| ASCII 兼容 / Base91 | 只可靠支持可打印 ASCII，或 Unicode 已被修改 | 约 23% |
+
+应用的 64 MiB 上限并不表示所有剪贴板都能承载 64 MiB 文本。远程桌面产品、浏览器、网关与
+安全策略可能设置更小的限制。V2 能发现截断，但不能提高底层通道本身的容量。
+
+### 通过光传输文件或文字
+
+1. 打开 `#/send`，选择 **文件** 或 **文字**，然后选择或输入内容。
+2. One Transfer 会检查发送电脑，并自动选择当前设备能够承担的最高“稳定/平衡/高速”档位。
+   文件上限会随档位同步更新；如果接收画面过小、模糊、被压缩或出现撕裂，请手动降低速度。
+3. 保持四个动态二维码完整可见。发送端进度条表示一轮建议喷泉码广播进度，不是接收确认。
+4. 在接收设备打开 `#/receive`，选择 **扫描电脑屏幕** 或 **使用相机**。
+5. 让二维码网格完整进入捕获画面。接收端可以乱序收集不同 symbol，并容忍漏帧和重复帧；
+   接收端进度条才表示真实恢复状态。
+6. 只有页面完成完整性校验后，才保存文件或复制恢复出的文字。
+
+### Mac 文件与目录辅助脚本
+
+工作区辅助脚本可以生成相同的 V2 文本；选择目录时会先生成 ZIP：
+
+```bash
+../deploy/add-transfer.sh /path/to/file-or-directory
+```
+
+默认使用 Base32768。需要 ASCII 兼容时运行：
+
+```bash
+ONE_TRANSFER_CODEC=base91 ../deploy/add-transfer.sh /path/to/file-or-directory
+```
+
+脚本依赖 `python3`、`pbcopy`，传目录时还需要 `zip`。目录归档会保留单一顶层目录，Windows
+还原脚本验证结构后再整体移动到目标位置。
+
+### 常见问题
+
+| 现象 | 处理方式 |
+|---|---|
+| Base32768 字符或填充错误 | 切换 **ASCII 兼容** 后重新复制 |
+| SHA-256 或长度校验失败 | 文本被截断或修改，应完整重新复制 |
+| 提示目标已存在 | 移动或重命名已有文件；脚本故意不自动覆盖 |
+| 网页复制按钮失败 | 允许剪贴板权限，或改用支持 HTTPS 剪贴板写入的浏览器 |
+| 二维码接收端长时间无信号 | 降低速度、放大二维码窗口、改善对焦，或直接捕获发送窗口 |
+| 二维码进度较慢但仍在变化 | 保持发送画面可见；掉帧只降低速度，不影响最终正确性 |
+
 ---
 
 ## 摘要
 
-One Transfer 研究两类能力不对称的数据通道。第一类通道只能传递文本，因此系统把文件、
-UTF-8 文件名和类型信息编码为版本化 Base64 文本，再在 Windows 端恢复原始数据；第二类
+One Transfer 研究两类能力不对称的数据通道。第一类通道只能传递文本，因此系统先按需压缩文件，
+默认编码为适合 UTF-16 的 Base32768，并提供 Base91 ASCII 回退，再在 Windows 端恢复；第二类
 通道只有可见屏幕而没有可靠回传链路，因此系统把文件或文字封装为带完整性校验的容器，
 使用 LT 喷泉码生成连续动态二维码，由另一设备通过屏幕捕获或相机完成光学接收。
 
@@ -74,7 +143,7 @@ UTF-8 文件名和类型信息编码为版本化 Base64 文本，再在 Windows 
 不接收业务文件。本文给出系统模型、双向传输协议、喷泉码设计、完整工作流、安全边界、
 性能模型与工程实现。
 
-**关键词：** 文本通道；Base64；动态二维码；LT 喷泉码；单向光学通道；React；Vite
+**关键词：** 文本通道；Base32768；Base91；动态二维码；LT 喷泉码；单向光学通道；React；Vite
 
 ---
 
@@ -136,7 +205,7 @@ flowchart LR
   end
 
   subgraph GROUP_B[Windows 接收端 / 光学发送端]
-    RESTORE[restore-base64.bat]
+    RESTORE[one-transfer-restore.bat]
     F[文件或文字]
     S[One Transfer 动态二维码发送]
   end
@@ -145,7 +214,7 @@ flowchart LR
     R[浏览器接收器]
   end
 
-  F1 -->|ONE_TRANSFER_V1 Base64 文本| T[文本通道]
+  F1 -->|ONE_TRANSFER_V2 高密度文本| T[文本通道]
   T --> RESTORE
   RESTORE -->|还原| F
 
@@ -158,11 +227,11 @@ flowchart LR
 
 | 方向 | 业务用途 | 物理通道 | 编码方式 | 接收实现 |
 |---|---|---|---|---|
-| 文本发送端 → Windows 接收端 | 文件 | 文本剪贴板或其他文本通道 | Base64 文本协议 | Windows BAT + PowerShell |
+| 文本发送端 → Windows 接收端 | 文件 | 文本剪贴板或其他文本通道 | gzip + Base32768/Base91 + SHA-256 | Windows BAT + PowerShell/C# |
 | 光学发送端 → 光学接收端 | 文件 | 屏幕 → 相机/屏幕捕获 | 文件容器 + LT 喷泉码 + QR | 浏览器 + ZXing WASM |
 | 光学发送端 → 光学接收端 | 文字 | 屏幕 → 相机/屏幕捕获 | UTF-8 文字容器 + LT 喷泉码 + QR | 浏览器展示并复制 |
 
-普通文字本身可直接通过文本通道，无需再次 Base64 编码；剪贴板文件协议主要
+普通文字本身可直接通过文本通道，无需再次二进制转文本；剪贴板文件协议主要
 解决“通道只允许文本，但业务对象是文件”的问题。
 
 ---
@@ -177,6 +246,7 @@ flowchart LR
 - GSAP 3 加载、路由、Tabs 与页面呼吸动效
 - `qrcode` 生成二维码
 - `zxing-wasm` 在 Web Worker 中解码二维码
+- `base32768` 生成适合 UTF-16 的高密度剪贴板文本，项目内实现 Base91 ASCII 回退
 - `vite-plugin-pwa` 生成 Service Worker 和离线缓存
 - Web Crypto、Compression Streams、Media Capture、Canvas 与 Clipboard API
 
@@ -203,7 +273,7 @@ HTML 入口只保留一份内联关键启动屏。React 完成挂载并加载传
 ### 3.3 PWA 与离线能力
 
 生产构建会缓存 SPA、JavaScript、CSS、ZXing WASM、Worker 和
-`restore-base64.bat`。首次联网加载完成后，可在无网络条件下继续打开和使用已缓存应用。
+`one-transfer-restore.bat`。首次联网加载完成后，可在无网络条件下继续打开和使用已缓存应用。
 严格隔离环境应在进入边界前完成缓存，或部署到组织批准的内部静态站点。
 
 ---
@@ -216,44 +286,54 @@ HTML 入口只保留一份内联关键启动屏。React 完成挂载并加载传
 
 1. 校验文件名是否能在 Windows 使用，包括非法字符、结尾空格/句点和保留设备名。
 2. 使用 `File.arrayBuffer()` 在浏览器本地读取文件字节。
-3. 将 UTF-8 文件名和文件内容分别编码为 Base64。
-4. 组成 `ONE_TRANSFER_V1` 文本并一键写入剪贴板，不在页面显示文件 Base64 内容。
-5. 如果现代 Clipboard API 不可用，则使用临时文本域与 `execCommand` 兼容复制。
+3. 计算 SHA-256；对尚未压缩的内容尝试 gzip，只有确实缩小时才采用。
+4. 默认使用 Base32768；如果通道会破坏高位 Unicode，则切换 Base91 ASCII 兼容模式。
+5. 组成 `ONE_TRANSFER_V2` 并一键写入剪贴板，不在页面渲染文件负载。
+6. 如果现代 Clipboard API 不可用，则使用临时文本域与 `execCommand` 兼容复制。
 
-Base64 的理论长度为 `4 × ceil(n / 3)`，因此文本通常约为原始文件的 1.33 倍，尚未包含
-协议头和文件名。实际可传大小受浏览器和具体文本通道容量共同限制。
+Base32768 每个安全 BMP 字符承载 15 bit，在 UTF-16 通道中效率为 93.75%，理论开销约
+6.67%，字符数约为 Base64 的 40%。Base91 只使用可打印 ASCII，开销约 23%，作为会修改
+高位 Unicode 的通道回退。页面会显示原始/压缩大小、最终字符数以及相对 V1 Base64 的
+预计节省比例。
 
 ### 4.2 剪贴板协议
 
-协议为单行文本，最多按 `|` 分为四段：
+V2 是八字段文本；第八段读取全部剩余内容，因此 Base91 负载中出现 `|` 也不会破坏协议：
 
 ```text
-ONE_TRANSFER_V1|<itemType>|<base64(UTF-8 name)>|<base64(payload)>
+ONE_TRANSFER_V2|<itemType>|<codec>|<compression>|<originalSize>|<sha256>|<percentEncodedName>|<payload>
 ```
 
 | 字段 | 含义 |
 |---|---|
-| `ONE_TRANSFER_V1` | 协议魔数和版本 |
+| `ONE_TRANSFER_V2` | 协议魔数和版本 |
 | `itemType` | `file` 或 `directory` |
-| 文件名 | UTF-8 文件名的 Base64 表示 |
-| 负载 | 原文件或目录 ZIP 的 Base64 表示 |
+| `codec` | `b32768` 或 `base91` |
+| `compression` | `none` 或 `gzip` |
+| `originalSize` | 解码后精确字节数，上限 64 MiB |
+| `sha256` | 原始字节的小写 SHA-256 |
+| 文件名 | 百分号编码的 UTF-8 basename |
+| 负载 | 原始字节、gzip 流或目录 ZIP 的文本编码 |
 
 网页当前一次处理一个文件。Mac 发送端如需传目录，可运行
-`../deploy/add-transfer.sh <目录路径>`；脚本先生成 ZIP，再使用同一协议写入剪贴板。
+`../deploy/add-transfer.sh <目录路径>`；脚本先生成 ZIP，再输出 V2 Base32768。需要 ASCII 时
+设置 `ONE_TRANSFER_CODEC=base91`。Windows 脚本仍能还原升级前生成的 V1 Base64 文本。
 
 ### 4.3 Windows 还原流程
 
-Windows 接收端首次使用时，可以从 `#/clipboard` 下载 `restore-base64.bat`，也可以复制页面
+Windows 接收端首次使用时，可以从 `#/clipboard` 下载 `one-transfer-restore.bat`，也可以复制页面
 中显示的完整脚本源码并保存为同名文件，然后放入目标目录。
 每次接收时双击该脚本：
 
 1. 检查 Windows PowerShell 是否存在。
 2. 使用 `Get-Clipboard -Raw` 读取纯文本剪贴板。
-3. 验证协议魔数、字段数量、内容类型和 Windows 文件名。
-4. 解码 Base64 文件名与负载。
-5. 拒绝覆盖脚本目录中的同名目标。
-6. 文件类型直接写入；目录类型先在随机临时目录解压，再整体移动到目标位置。
-7. 输出原始数据 MD5，清理临时 ZIP 和解压目录，并停留显示结果。
+3. 自动识别 V1/V2，并在分配输出前验证全部协议字段。
+4. V2 通过内嵌编译的 C# 高速解码 Base32768/Base91；V1 保留 Base64 兼容解码。
+5. gzip 解压以协议原始大小为硬上限。
+6. 写盘前验证精确长度与 SHA-256。
+7. 拒绝覆盖脚本目录中的同名目标。
+8. 文件直接写入；目录 ZIP 在随机临时目录解压后整体移动。
+9. 输出 SHA-256，清理临时数据并停留显示结果。
 
 还原脚本不执行来自剪贴板的命令，也不会把文件名拼入 PowerShell 命令文本；文件名仅作为
 经过校验的路径参数使用。
@@ -266,14 +346,68 @@ sequenceDiagram
   participant C as 文本剪贴板通道
   participant W as Windows 接收端
 
-  W->>W: 首次下载 restore-base64.bat
+  W->>W: 首次下载 one-transfer-restore.bat
   E->>E: 选择文件并读取本地字节
-  E->>E: 编码 ONE_TRANSFER_V1 Base64 文本
+  E->>E: 按需 gzip、SHA-256、Base32768/Base91
+  E->>E: 编码 ONE_TRANSFER_V2 文本
   E->>C: 复制纯文本
   C->>W: 同步文本剪贴板
-  W->>W: 双击 BAT，校验并解码
-  W->>W: 在脚本目录还原文件并显示 MD5
+  W->>W: 双击 BAT，解码、解压并校验
+  W->>W: 在脚本目录还原文件并显示 SHA-256
 ```
+
+### 4.5 压缩流水线与体积优化
+
+剪贴板发送端按以下顺序处理数据：
+
+```text
+原始字节
+  ├─ SHA-256(原始字节)
+  └─ 可选 gzip
+       └─ Base32768 或 Base91
+            └─ ONE_TRANSFER_V2 头 + 编码负载
+```
+
+网页发送端只有在内容是文件、大小至少 768 字节，并且 MIME 类型不属于已压缩格式时，才会
+尝试 gzip。即使完成压缩，也只有满足以下条件才采用：
+
+```text
+gzipSize + 64 < originalSize
+```
+
+预留 64 字节收益门槛，是为了避免只节省极少空间却增加接收端解压工作。视频、ZIP/gzip/
+7z/RAR/xz/zstd、大多数 JPEG/PNG/WebP 类图片、压缩音频、Office Open XML 和 OpenDocument
+会直接跳过。BMP、SVG、TIFF、WAV、AIFF、普通文本、JSON、源码、CSV、XML 和日志仍会尝试。
+Mac 辅助脚本会实际执行 gzip，再使用相同的 64 字节收益条件决定是否采用。
+
+设原始字节数为 `N`，可选 gzip 后实际传输字节数为 `C`，V2 协议头和编码文件名字符数为
+`H`，则最终文本长度可近似表示为：
+
+```text
+Base32768 字符数 ≈ ceil(8 × C / 15) + H
+Base91 字符数    ≈ 1.23 × C + H
+旧版 Base64      ≈ 4 × ceil(N / 3) + legacyHeader
+```
+
+Base32768 在字符数量和 UTF-16 存储中更小。如果中间服务把文本转换成 UTF-8，并按照 UTF-8
+字节数限制，BMP 字符通常占三个 UTF-8 字节；此时 Base91 虽然可见字符更多，实际线路字节数
+却可能更小。应以真实通道的限制方式和实测结果为准，不能只看浏览器显示的字符数。
+
+减小传输文本体积时建议：
+
+1. 除非通道会修改 Unicode 或明确只允许 ASCII，否则优先使用 **高密度 Unicode**。
+2. 文本类文件交给 One Transfer 自动 gzip 即可；单独把一个普通文本预先打成 ZIP 通常没有
+   必要，也会丢失页面用于解释压缩策略的 MIME 信息。
+3. 不要反复压缩 JPEG、PNG、WebP、MP4、ZIP、7z、RAR、Office 等熵编码文件。它们通常不会
+   继续变小，但 Base32768 仍能降低二进制转文本开销。
+4. 创建目录归档前先删除缓存、构建产物、无用调试日志等不需要传递的内容。压缩无法替代
+   对无用数据的清理。
+5. 目录使用 Mac 辅助脚本生成单一 ZIP，比逐个文件分别传输更方便。
+6. 如果具体剪贴板上限小于最终 V2 字符数，请先把源文件拆成较小文件再分别编码。V2 当前
+   一次还原一条完整记录，不维护多段传输状态。
+
+还原过程严格反向执行：文本解码 → 有上限的 gzip 解压 → 精确长度校验 → SHA-256 校验 →
+写盘。脚本不单独信任 gzip 尾部或协议声明大小，任何一步失败都不会生成目标文件。
 
 ---
 
@@ -297,9 +431,10 @@ sequenceDiagram
 | 17 | 32 | SHA-256 | 原始文件摘要 |
 | 49 | 可变 | Name + Type + Payload | 文件名、MIME 和文件内容 |
 
-文件上限为 64 MiB，文字上限为 4 MiB。发送端对可压缩内容尝试 gzip；JPEG、视频、ZIP、
-Office Open XML 等已经压缩的格式直接跳过，以避免额外内存和 CPU 开销。只有压缩结果至少
-节省 64 字节时才采用 gzip。
+光学文件上限从当前档位的每码字节数、20 字节帧头和 `u16` 源块数动态计算：
+稳定约 90.2 MiB、平衡约 104.9 MiB、高速约 144.3 MiB。文字上限仍为 4 MiB，剪贴板文件上限仍为
+64 MiB。发送端对可压缩内容尝试 gzip；JPEG、视频、ZIP、Office Open XML 等已经压缩的格式
+直接跳过，以避免额外内存和 CPU 开销。只有压缩结果至少节省 64 字节时才采用 gzip。
 
 接收端解压时不信任 gzip 尾部声明，而是流式累计输出并使用原始长度作为硬上限，避免小型
 压缩包异常膨胀。
@@ -401,7 +536,7 @@ sequenceDiagram
 ### 6.1 文字通过文本通道传递
 
 该方向已经存在纯文本剪贴板通道，因此直接复制粘贴即可。把普通文字再次封装为文件不会
-增加能力，只会增加 Base64 开销。
+增加能力，只会增加二进制转文本开销。
 
 ### 6.2 文字通过光学通道传递
 
@@ -421,9 +556,9 @@ sequenceDiagram
 | 光学流 | LT 喷泉码 | 容忍帧丢失、重复和乱序 |
 | 帧集合 | FNV-1a | 快速检查恢复出的容器是否一致 |
 | 文件 | SHA-256 | 最终验证原始文件内容 |
-| 剪贴板还原 | Base64 解码 + MD5 显示 | 检测文本截断，并支持人工比对 |
+| 剪贴板还原 | 协议长度 + SHA-256 | 写盘前拒绝截断或篡改 |
 
-FNV-1a 和 MD5 仅用于误码检测与人工核对，不应视为抗攻击认证。SHA-256 保证内容摘要一致，
+FNV-1a 仅用于快速误码检测，不应视为抗攻击认证。SHA-256 保证内容摘要一致，
 但由于摘要与数据来自同一未认证通道，也不等价于发送方身份认证。
 
 ### 7.2 防护措施
@@ -438,11 +573,11 @@ FNV-1a 和 MD5 仅用于误码检测与人工核对，不应视为抗攻击认�
 
 ### 7.3 明确风险
 
-- **无保密性：** 文本剪贴板中的 Base64 和屏幕上的二维码都包含原始数据。
+- **无保密性：** 剪贴板编码文本和屏幕二维码都包含原始数据。
 - **无认证：** 任何能写入剪贴板或把二维码放进扫描画面的人都能提供输入。
 - **可审计性：** 运行环境、终端软件或操作系统可能记录剪贴板内容和屏幕行为。
 - **肩窥风险：** 光学发送期间，任何能看到屏幕的相机都可能接收数据。
-- **容量风险：** 大型 Base64 文本可能被剪贴板通道截断；脚本会失败，但不能提高通道上限。
+- **容量风险：** 大型文本仍可能被通道截断；V2 会拒绝损坏结果，但不能提高通道上限。
 
 敏感数据需要额外加密时，应先在发送端使用组织批准的加密工具生成密文文件，再使用
 One Transfer 传递密文。
@@ -453,14 +588,11 @@ One Transfer 传递密文。
 
 ### 8.1 文本剪贴板通道
 
-设原文件大小为 `N`，则 Base64 负载近似为：
-
-```text
-B = 4 × ceil(N / 3)
-```
-
-传输时间主要由实际文本通道实现决定。One Transfer 在发送端和接收端都需要至少
-容纳原始字节、Base64 文本和解码结果，因此实际可用上限通常低于浏览器的理论内存上限。
+对未压缩字节，Base32768 在 UTF-16 通道中的理论开销约为 6.67%，每个输入字节约产生
+0.533 个字符；Base91 开销约 23%，但完全由可打印 ASCII 组成。如果中间服务按 UTF-8
+字节收费而不是按字符或 UTF-16 code unit 限制，Base32768 可能反而更大，因此 V2 同时提供
+两种模式。文本、JSON、源码和日志通常先被 gzip 大幅缩小，压缩收益会超过编码差异。
+发送与接收端仍需同时容纳原始、传输和解码数据，因此实际上限低于浏览器理论内存上限。
 
 ### 8.2 光学通道
 
@@ -531,7 +663,7 @@ one-transfer/
 ```
 
 `../deploy/add-transfer.sh` 是工作区级 Mac 辅助脚本，不属于 Web SPA 构建产物；它与网页
-共享 `ONE_TRANSFER_V1` 协议。
+共享 `ONE_TRANSFER_V2` Base32768/Base91 协议。
 
 ---
 
@@ -566,8 +698,8 @@ HTTPS；开发证书为自签名证书，首次访问需要由测试人员明确
 
 ### 10.3 Cloudflare Pages
 
-`deploy-wrangler.yml` 会对 Pull Request 执行测试与构建；只有推送到 `main` 或手动触发时，
-才会通过 Wrangler 部署 `dist/`。仓库需要配置：
+`pages.yml` 中的 `cloudflare-pages` job 会复用已经测试过的站点 artifact；只有推送到 `main`
+或手动触发时，才会通过 Wrangler 部署 `dist/`。仓库需要配置：
 
 - `CLOUDFLARE_API_TOKEN`：仅授予 Cloudflare Pages 编辑权限；
 - `CLOUDFLARE_ACCOUNT_ID`：Cloudflare 账户 ID。
@@ -583,8 +715,8 @@ Makefile 会读取本地 `.env` 中的 Cloudflare 凭据，执行构建后使用
 
 ### 10.4 GitHub Pages 自动部署
 
-独立的 `pages.yml` 会在推送到 `main` 或手动触发时测试、构建、上传 Pages artifact，
-再通过 GitHub Actions 部署。仓库 **Settings → Pages → Source** 应保持为
+同一个 `pages.yml` 只测试和构建一次，再把 artifact 分别部署到 GitHub Pages 与 Cloudflare
+Pages。仓库 **Settings → Pages → Source** 应保持为
 **GitHub Actions**。
 
 ### 10.5 构建版本与更新检查
@@ -615,7 +747,7 @@ Vite 会把 `package.json` 版本、构建时间和 Git commit 写入应用，�
 1. `dist/` 只包含一个 `index.html`。
 2. `dist/version.json` 与 JavaScript 构建中写入的版本一致。
 3. Service Worker 预缓存 SPA、Workers、WASM 和 Windows 还原脚本。
-4. `public/restore-base64.bat` 与工作区部署脚本保持一致。
+4. `public/one-transfer-restore.bat` 与工作区部署脚本保持一致。
 5. 在真实 Windows 接收端完成一次文本还原，并通过相机或屏幕捕获完成一次光学传输。
 
 前四项可以在开发机自动验证；第五项属于真实运行环境边界，不能由静态构建替代。
@@ -635,7 +767,7 @@ Vite 会把 `package.json` 版本、构建时间和 Git commit 写入应用，�
 
 ## 13. 结论
 
-One Transfer 为两类能力不同的通道定义了一套完整数据流：文件以 Base64 文本通过文本
+One Transfer 为两类能力不同的通道定义了一套完整数据流：文件以 gzip/Base32768 或 Base91 V2 文本通过文本
 通道传递，文件和文字也可以使用 LT 喷泉码动态二维码经光学链路传递。文本协议解决
 “通道只能承载文字”的问题，喷泉码解决“屏幕到相机无回传、会丢帧”的问题；React SPA
 则统一了发送、接收、加载与生命周期管理。
@@ -655,6 +787,8 @@ One Transfer 为两类能力不同的通道定义了一套完整数据流：文�
 6. `zxing-wasm`，[Reader API 与解码选项](https://github.com/Sec-ant/zxing-wasm#reader-api)。
 7. `zxing-cpp`，[WebAssembly 性能说明](https://github.com/zxing-cpp/zxing-cpp/tree/master/wrappers/wasm)。
 8. `RaptorQR`，[多二维码光传输实现与基准](https://github.com/infrost/RaptorQR)。
+9. `base32768`，[面向 UTF-16 的高密度二进制转文本编码](https://github.com/qntm/base32768)。
+10. M. Botta 等，[《A Survey of Printable Encodings》，Algorithms 18(8)，2025](https://doi.org/10.3390/a18080504)。
 
 ## License
 

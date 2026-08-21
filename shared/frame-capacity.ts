@@ -1,12 +1,15 @@
 // How much payload fits in a stream at a given frame size.
 //
-// The frame header numbers source blocks in a u16, so a large payload at a
-// small bytes-per-frame runs out of block numbers long before it runs out of
-// the file size limit: at 500 bytes per frame the real ceiling is about 30 MB,
-// not 64. The sender has to catch that before it starts streaming, and tell
-// you which setting fixes it.
+// The frame header numbers source blocks in a u16, so every bytes-per-frame
+// profile has a different ceiling. The sender derives its file limit from that
+// ceiling instead of maintaining a second fixed number.
 
-import { HEADER_LEN } from "./protocol";
+import {
+  FILE_CONTAINER_HEADER_LEN,
+  HEADER_LEN,
+  MAX_FILE_NAME_BYTES,
+  MAX_MEDIA_TYPE_BYTES,
+} from "./protocol";
 
 /** `k` is a u16 in the frame header. */
 export const MAX_SOURCE_BLOCKS = 0xffff;
@@ -25,6 +28,26 @@ export function fitsInOneStream(payloadBytes: number, frameBytes: number): boole
   return sourceBlockCount(payloadBytes, frameBytes) <= MAX_SOURCE_BLOCKS;
 }
 
+/** Largest complete container that the frame profile can address. */
+export function maximumStreamPayloadBytes(frameBytes: number): number {
+  return MAX_SOURCE_BLOCKS * blockLength(frameBytes);
+}
+
+/**
+ * Conservative original-file limit for a profile. Reserve the maximum encoded
+ * filename and media type so every file accepted by the label is guaranteed to
+ * fit, even when gzip does not reduce it.
+ */
+export function maximumFileBytes(frameBytes: number): number {
+  return Math.max(
+    0,
+    maximumStreamPayloadBytes(frameBytes) -
+      FILE_CONTAINER_HEADER_LEN -
+      MAX_FILE_NAME_BYTES -
+      MAX_MEDIA_TYPE_BYTES,
+  );
+}
+
 /** The smallest bytes-per-frame that can carry this payload at all. */
 export function minimumFrameBytes(payloadBytes: number): number {
   return Math.ceil(payloadBytes / MAX_SOURCE_BLOCKS) + HEADER_LEN;
@@ -34,9 +57,7 @@ export function minimumFrameBytes(payloadBytes: number): number {
  * The smallest offered setting that works, so the sender can name a value that
  * is actually in the dropdown instead of the bare arithmetic minimum.
  *
- * Undefined when no option is large enough — unreachable while MAX_FILE_BYTES
- * holds, since the largest legal payload needs about 1045 bytes per frame, but
- * the caller should not have to know that.
+ * Undefined when no offered option is large enough.
  */
 export function smallestSufficientFrameSize(
   payloadBytes: number,
