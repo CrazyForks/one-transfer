@@ -342,8 +342,21 @@ LT（Luby Transform）喷泉码解决该问题：
 
 默认高吞吐布局在每次画面更新中同时显示 4 个可独立解码的二维码。每秒更新 30 次、
 每码 1700 字节，因此每秒发出 120 个 symbol；扣除 20 字节帧头后，每码携带 1680 字节
-编码块。QR 纠错级别为 L。复杂屏幕、远距离或低质量相机可将每码字节数降到 1465，
-并将画面更新率降到 24 次/秒，以提高单码识别率。
+编码块。QR 纠错级别为 L。页面只提供一个 shadcn/ui 速度滑块，将二维码密度和更新率
+组合成“稳定、平衡、高速”三个档位；复杂屏幕、远距离或低质量相机应向最低档调整。
+
+进入发送页后，One Transfer 会先检查浏览器允许读取的本机能力：逻辑 CPU 数、近似内存、
+通过动画帧测得的刷新率，以及当前窗口短边尺寸。只有完整满足条件时才选择更高档位：
+
+| 档位 | 本机推荐边界 | 原始吞吐模型 |
+|---|---|---:|
+| 稳定 | CPU、刷新率或画面尺寸受限 | 约 135 KiB/s |
+| 平衡 | 4+ 逻辑线程、约 45+ Hz、窗口短边 540px+ | 约 197 KiB/s |
+| 高速 | 8+ 逻辑线程、约 55+ Hz、窗口短边 720px+ | 约 271 KiB/s |
+
+部分浏览器会因隐私策略隐藏 `deviceMemory`，未知值不会单独触发降档。页面会在滑块下方显示
+检测结果、推荐档位和选择原因。该检测只能判断发送电脑，无法看到接收端 CPU、相机质量或
+远程桌面压缩情况，因此识别不稳定时仍可手动降档。
 
 ### 5.4 二维码生成与接收
 
@@ -477,13 +490,16 @@ netKiB/s ≈ rawKiB/s × decodeSuccessRate / fountainOverhead
 光学链路是单向通道，因此发送端无法根据接收结果进行闭环帧率自适应。当远程桌面或采集流
 达不到 30 帧时，接收端会看到缺失或重复的 symbol：传输会变慢，但 LT 恢复与最终校验会
 阻止损坏文件被接受。接收端根据逻辑 CPU 数量默认启动 2～4 个解码 Worker，并在持续繁忙时
-自动扩容；图像质量长期不稳定时，仍可在页面中显式切换为 1465 字节 / 24 次更新的保守参数。
+自动扩容；图像质量长期不稳定时，将唯一的速度滑块调到最低，即会使用 1465 字节 / 24 次
+更新的“稳定”档位。
 
 当前线协议仍使用现有 LT 喷泉码。RaptorQ 可作为后续方向，以获得更低、更稳定的恢复开销，
 但它需要引入版本化协议变更，不属于本次 4 二维码高吞吐更新。
 
-进度条不直接使用“已解出的源块比例”，因为 peeling 解码会在后半段集中级联。实现综合
-不同帧数量、理论喷泉码开销和已解块数量，完成校验前最多显示 99%。
+发送端进度条表示“一轮建议广播”的完成比例：已播放 symbol 数除以根据 `K` 和喷泉码预期开销
+算出的目标数。由于发送端没有回传，进度到达一轮末尾后会继续下一轮，不能代表接收完成。
+接收端进度条才是真实恢复进度；它综合不同帧数量、理论喷泉码开销和已解块数量，完成校验前
+最多显示 99%。
 
 ---
 
@@ -496,7 +512,8 @@ one-transfer/
 │   ├── main.tsx               # React 根节点与 HashRouter
 │   ├── app.tsx                # 持久路由、页面、loading 与 GSAP
 │   ├── styles.css             # Tailwind 入口与动态控制器样式
-│   ├── components/ui/         # 本地 shadcn/ui Button、Card、Tabs、SweepShine
+│   ├── components/            # 构建信息、更新检查与本地 shadcn/ui
+│   ├── lib/device-capabilities.ts # 浏览器设备能力检测
 │   └── lib/utils.ts           # shadcn/ui class 合并工具
 ├── send/main.ts               # 文件/文字封装、LT 编码与 QR 播放
 ├── receive/
@@ -506,7 +523,8 @@ one-transfer/
 │   └── wasm-url.ts            # WASM 静态资源 URL
 ├── clipboard/main.ts          # 浏览器文件转文本剪贴板
 ├── shared/                    # 协议、喷泉码、校验、格式化与通用逻辑
-├── public/restore-base64.bat  # Windows 接收端还原脚本
+├── public/                    # Windows 还原脚本与更新检查 Worker
+├── .github/workflows/         # GitHub Pages 与 Cloudflare Pages 部署
 ├── tests/                     # 协议黄金向量和单元测试
 ├── vite.config.ts             # SPA、HTTPS 开发环境和 PWA
 └── wrangler.toml              # Cloudflare Pages 配置
@@ -548,6 +566,14 @@ HTTPS；开发证书为自签名证书，首次访问需要由测试人员明确
 
 ### 10.3 Cloudflare Pages
 
+`deploy-wrangler.yml` 会对 Pull Request 执行测试与构建；只有推送到 `main` 或手动触发时，
+才会通过 Wrangler 部署 `dist/`。仓库需要配置：
+
+- `CLOUDFLARE_API_TOKEN`：仅授予 Cloudflare Pages 编辑权限；
+- `CLOUDFLARE_ACCOUNT_ID`：Cloudflare 账户 ID。
+
+仍可在本地执行：
+
 ```bash
 make deploy
 ```
@@ -557,8 +583,16 @@ Makefile 会读取本地 `.env` 中的 Cloudflare 凭据，执行构建后使用
 
 ### 10.4 GitHub Pages 自动部署
 
-仓库只保留 `pages.yml`：推送到 `main` 或手动触发时构建 `dist/`，并部署到
-GitHub Pages。
+独立的 `pages.yml` 会在推送到 `main` 或手动触发时测试、构建、上传 Pages artifact，
+再通过 GitHub Actions 部署。仓库 **Settings → Pages → Source** 应保持为
+**GitHub Actions**。
+
+### 10.5 构建版本与更新检查
+
+Vite 会把 `package.json` 版本、构建时间和 Git commit 写入应用，同时生成
+`dist/version.json`。`BuildInfo` 在开发者控制台输出完整信息，页脚显示版本号和短 commit。
+同源 Worker 会在启动、页面重新可见以及每五分钟检查一次 `version.json`；版本或 commit
+变化时显示更新提示。PWA Service Worker 继续负责缓存替换和新控制器激活。
 
 ---
 
@@ -572,17 +606,19 @@ GitHub Pages。
 - 确定性对数、鲁棒孤子分布、块索引与跨会话差异。
 - LT 编解码、乱序、重复帧和 30% 随机丢帧恢复。
 - 帧容量上限、显示尺寸、进度估算、无信号提示与 Worker 池生命周期。
+- 受限、普通与高性能发送设备的自动档位推荐。
 - 四码吞吐模型、Worker 批量解码结果与性能计数器。
 - 文件与 UTF-8 文字的完整往返。
 
 生产构建还应确认：
 
 1. `dist/` 只包含一个 `index.html`。
-2. Service Worker 预缓存 SPA、Worker、WASM 和 Windows 还原脚本。
-3. `public/restore-base64.bat` 与工作区部署脚本保持一致。
-4. 在真实 Windows 接收端完成一次文本还原，并通过相机或屏幕捕获完成一次光学传输。
+2. `dist/version.json` 与 JavaScript 构建中写入的版本一致。
+3. Service Worker 预缓存 SPA、Workers、WASM 和 Windows 还原脚本。
+4. `public/restore-base64.bat` 与工作区部署脚本保持一致。
+5. 在真实 Windows 接收端完成一次文本还原，并通过相机或屏幕捕获完成一次光学传输。
 
-前三项可以在开发机自动验证；第四项属于真实运行环境边界，不能由静态构建替代。
+前四项可以在开发机自动验证；第五项属于真实运行环境边界，不能由静态构建替代。
 
 ---
 

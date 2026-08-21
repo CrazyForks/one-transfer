@@ -351,8 +351,24 @@ Each QR frame contains a 20-byte little-endian header followed by one encoded bl
 
 The default high-throughput layout displays four independently decodable QR symbols per visual tick.
 At 30 ticks per second and 1700 bytes per symbol, it emits 120 symbols per second; the 20-byte header
-leaves a 1680-byte encoded block in every symbol. QR error-correction level L is used. Difficult
-displays or cameras should reduce the frame size to 1465 and the visual tick rate to 24 per second.
+leaves a 1680-byte encoded block in every symbol. QR error-correction level L is used. A single shadcn/ui
+speed slider combines the frame-size and tick-rate choices into Stable, Balanced, and Fast presets;
+difficult displays or cameras should move it toward the minimum.
+
+On the send page, One Transfer first inspects the capabilities the browser may expose: logical CPU
+count, approximate device memory, measured animation refresh rate, and the shorter viewport edge. It
+then applies the highest preset whose complete requirements are met:
+
+| Preset | Local recommendation boundary | Raw model |
+|---|---|---:|
+| Stable | Constrained CPU, refresh rate, or viewport | about 135 KiB/s |
+| Balanced | 4+ logical CPUs, about 45+ Hz, 540px+ short edge | about 197 KiB/s |
+| Fast | 8+ logical CPUs, about 55+ Hz, 720px+ short edge | about 271 KiB/s |
+
+Missing privacy-restricted values, such as `deviceMemory` in some browsers, do not automatically lower
+the recommendation. The result and its evidence are shown under the slider. This inspection covers the
+sending computer only; receiver camera quality, remote-desktop compression, and receiver CPU remain
+unknown, so the user can always lower the preset manually.
 
 ### 5.4 Capture and Decode
 
@@ -475,16 +491,18 @@ The optical link is intentionally one-way, so the sender cannot perform feedback
 If a remote desktop or capture stream delivers fewer than 30 visual frames per second, the receiver sees
 missing or repeated symbols: completion takes longer, but LT recovery and the final checksum prevent a
 damaged file from being accepted. The receiver starts 2–4 decode workers from the available logical CPU
-count and can grow the pool when workers remain saturated. For a persistently weak image, the UI still
-allows an explicit 1465-byte / 24-tick fallback.
+count and can grow the pool when workers remain saturated. For a persistently weak image, moving the
+single speed slider to its minimum selects the 1465-byte / 24-tick Stable preset.
 
 The current wire protocol still uses the existing LT fountain code. RaptorQ is a future option for
 lower and more predictable recovery overhead, but adopting it requires a versioned protocol change and
 is not part of the present four-QR throughput update.
 
-The progress model does not use solved-block ratio alone because peeling cascades late. It combines
-unique frame count, estimated fountain overhead, and solved blocks, and never reports 100% before final
-verification.
+The sender progress bar measures one recommended broadcast round: emitted symbols divided by the LT
+target derived from `K` and the expected fountain overhead. It repeats because the one-way sender cannot
+know when the receiver has finished. The receiver progress bar is the authoritative recovery progress;
+it combines unique frame count, expected overhead, and solved blocks, and never reports 100% before
+final verification.
 
 ---
 
@@ -497,7 +515,8 @@ one-transfer/
 │   ├── main.tsx               # React root and HashRouter
 │   ├── app.tsx                # Persistent routes, views, loading, and GSAP
 │   ├── styles.css             # Tailwind entry and dynamic controller styles
-│   ├── components/ui/         # Local shadcn/ui Button, Card, Tabs, SweepShine
+│   ├── components/            # Build info, update checker, and local shadcn/ui
+│   ├── lib/device-capabilities.ts # Browser capability inspection
 │   └── lib/utils.ts           # shadcn/ui class merging helper
 ├── send/main.ts               # Container creation, LT encoding, QR playback
 ├── receive/
@@ -507,7 +526,8 @@ one-transfer/
 │   └── wasm-url.ts            # Decoder WASM asset URL
 ├── clipboard/main.ts          # Browser file-to-text clipboard sender
 ├── shared/                    # Protocols, fountain code, validation, utilities
-├── public/restore-base64.bat  # Windows clipboard receiver
+├── public/                    # Windows receiver and update-check Worker
+├── .github/workflows/         # GitHub Pages and Cloudflare Pages deployment
 ├── tests/                     # Golden vectors and unit tests
 ├── vite.config.ts             # SPA, HTTPS development, and PWA configuration
 └── wrangler.toml              # Cloudflare Pages configuration
@@ -546,6 +566,14 @@ The development certificate is self-signed and must be explicitly accepted on ea
 
 ### 10.3 Cloudflare Pages
 
+The `deploy-wrangler.yml` GitHub workflow tests and builds every pull request. A push to `main` or a
+manual dispatch deploys `dist/` with Wrangler. Configure these repository secrets:
+
+- `CLOUDFLARE_API_TOKEN`, limited to Cloudflare Pages edit access;
+- `CLOUDFLARE_ACCOUNT_ID`.
+
+Local deployment remains available:
+
 ```bash
 make deploy
 ```
@@ -555,8 +583,17 @@ project `one-transfer`.
 
 ### 10.4 GitHub Pages Automation
 
-The repository keeps a single workflow: `pages.yml`. A push to `main` or a
-manual dispatch builds `dist/` and deploys it to GitHub Pages.
+The independent `pages.yml` workflow tests, builds, uploads the Pages artifact, and deploys it through
+GitHub Actions on a push to `main` or a manual dispatch. In repository **Settings → Pages**, keep
+**Source** set to **GitHub Actions**.
+
+### 10.5 Build Version and Update Checks
+
+Vite embeds the package version, build time, and Git commit in the application and emits the same data
+as `dist/version.json`. `BuildInfo` prints the values once in the developer console, while the footer
+shows the version and short commit. A small same-origin Worker checks `version.json` on startup, when
+the tab becomes visible, and every five minutes. A changed version or commit displays an explicit update
+notice; the existing PWA service worker still owns cache replacement and controller activation.
 
 ---
 
@@ -570,13 +607,14 @@ Automated coverage includes:
 - deterministic log, robust soliton distribution, and block-index generation;
 - LT recovery with out-of-order, duplicate, and 30% dropped frames;
 - frame capacity, display sizing, progress estimates, no-signal behavior, and worker lifecycle;
+- automatic device recommendations for constrained, balanced, and capable senders;
 - four-symbol throughput calculations, batched worker results, and decoder performance counters;
 - complete file and UTF-8 text round trips.
 
-A production check must also confirm that `dist/` contains one `index.html`, the service worker caches
-the worker/WASM/Windows script, and the public BAT matches the workspace deployment copy. A real
-Windows clipboard import and a real optical export remain runtime checks that static builds cannot
-replace.
+A production check must also confirm that `dist/` contains one `index.html`, `version.json` matches the
+embedded build version, the service worker caches the Workers/WASM/Windows script, and the public BAT
+matches the workspace deployment copy. A real Windows clipboard import and a real optical export remain
+runtime checks that static builds cannot replace.
 
 ---
 

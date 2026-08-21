@@ -15,6 +15,9 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+    env:
+      HUSKY: 0
+      TZ: Asia/Shanghai
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -27,6 +30,7 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -34,6 +38,9 @@ jobs:
       - name: Configure GitHub Pages
         id: pages
         uses: actions/configure-pages@v5
+
+      - name: Test
+        run: pnpm test
 
       - name: Build
         run: pnpm build

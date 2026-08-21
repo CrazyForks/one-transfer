@@ -4,14 +4,33 @@ import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
 import { fileURLToPath, URL } from "node:url";
 
+const appVersion = process.env.npm_package_version || "0.0.0";
+const buildTime = new Date().toISOString();
+const appCommit = process.env.GITHUB_SHA || process.env.CF_PAGES_COMMIT_SHA || "development";
+
 export default defineConfig({
   base: "./",
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
+    __APP_BUILD_TIME__: JSON.stringify(buildTime),
+    __APP_COMMIT__: JSON.stringify(appCommit),
+  },
   plugins: [
+    {
+      name: "one-transfer-version-manifest",
+      generateBundle() {
+        this.emitFile({
+          type: "asset",
+          fileName: "version.json",
+          source: JSON.stringify({ version: appVersion, buildTime, commit: appCommit }),
+        });
+      },
+    },
     tailwindcss(),
     basicSsl(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["restore-base64.bat"],
+      includeAssets: ["restore-base64.bat", "app-update-checker.worker.js"],
       manifest: {
         name: "One Transfer",
         short_name: "One Transfer",

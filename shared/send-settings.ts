@@ -16,6 +16,22 @@ export const QR_SYMBOLS_PER_TICK = 4;
 export const DEFAULT_TX_FPS = 30;
 export const DEFAULT_FRAME_BYTES = 1700;
 
+export interface SendSpeedProfile {
+  label: string;
+  txFps: number;
+  frameBytes: number;
+}
+
+/** One slider replaces independent settings that could form poor combinations. */
+export const SEND_SPEED_PROFILES: readonly SendSpeedProfile[] = [
+  { label: "稳定", txFps: NO_SIGNAL_HINT_TX_FPS, frameBytes: NO_SIGNAL_HINT_FRAME_BYTES },
+  { label: "平衡", txFps: DEFAULT_TX_FPS, frameBytes: DEFAULT_FRAME_BYTES },
+  { label: "高速", txFps: DEFAULT_TX_FPS, frameBytes: 2331 },
+];
+
+export const DEFAULT_SPEED_PROFILE_INDEX = 1;
+export const SEND_SPEED_CHANGE_EVENT = "one-transfer:speed-change";
+
 // The hint values appear in these lists by construction, not by coincidence.
 export const TX_FPS_OPTIONS: readonly number[] = [
   10,

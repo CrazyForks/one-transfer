@@ -2,9 +2,8 @@
 //
 // Tuning notes from the experiments this PoC is distilled from:
 // - Frame payload sets the QR version; denser wins on goodput as long as the
-//   receiver can still decode it. 1465 bytes ≈ V27 is a safe middle ground
-//   for arbitrary monitors; 2953 (V40) is the ceiling and works phone-to-
-//   phone at close range.
+//   receiver can still decode it. The single speed slider exposes only tested
+//   combinations instead of letting four independent controls fight each other.
 // - The mask pattern is pinned (any declared mask is valid to a decoder);
 //   this skips the spec's 8-way mask evaluation and speeds generation ~4×.
 // - Displays need each frame shown for ≥2 refresh cycles or captures catch
@@ -19,8 +18,6 @@ import { formatBytes } from "../shared/format";
 import {
   blockLength,
   fitsInOneStream,
-  minimumFrameBytes,
-  smallestSufficientFrameSize,
   sourceBlockCount,
 } from "../shared/frame-capacity";
 import { LTEncoder } from "../shared/fountain";
@@ -36,12 +33,13 @@ import {
 } from "../shared/protocol";
 import { statusLine } from "../shared/status-line";
 import { requestScreenWakeLock } from "../shared/wake-lock";
+import { expectedFountainOverhead } from "../shared/progress";
+import { SEND_PROGRESS_EVENT, type SendProgressDetail } from "../shared/send-events";
 import {
-  DEFAULT_FRAME_BYTES,
-  DEFAULT_TX_FPS,
-  FRAME_BYTES_OPTIONS,
+  DEFAULT_SPEED_PROFILE_INDEX,
   QR_SYMBOLS_PER_TICK,
-  TX_FPS_OPTIONS,
+  SEND_SPEED_CHANGE_EVENT,
+  SEND_SPEED_PROFILES,
 } from "../shared/send-settings";
 
 const MARGIN = 4; // quiet-zone modules
@@ -62,10 +60,7 @@ const sendSnippetBtn = document.getElementById("send-snippet") as HTMLButtonElem
 const paneFile = document.getElementById("pane-file")!;
 const paneSnippet = document.getElementById("pane-snippet")!;
 const modeInputs = [...document.querySelectorAll<HTMLInputElement>('input[name="send-mode"]')];
-const cfgFps = document.getElementById("cfg-fps") as HTMLSelectElement;
-const cfgBytes = document.getElementById("cfg-bytes") as HTMLSelectElement;
-const cfgEcc = document.getElementById("cfg-ecc") as HTMLSelectElement;
-const cfgSize = document.getElementById("cfg-size") as HTMLInputElement;
+const cfgSpeed = document.getElementById("cfg-speed") as HTMLElement;
 
 let selectedFile: {
   name: string;
@@ -77,6 +72,10 @@ let selectedFile: {
 let generation = 0; // bumped on every restart; stale loops see it and die
 let resizeDisplay: (() => void) | null = null;
 let stopStream: (() => void) | null = null;
+const initialSpeedProfileIndex = Number(cfgSpeed.dataset.speedIndex);
+let speedProfileIndex = SEND_SPEED_PROFILES[initialSpeedProfileIndex]
+  ? initialSpeedProfileIndex
+  : DEFAULT_SPEED_PROFILE_INDEX;
 
 const specsLine = statusLine(specs);
 const setStatus = specsLine.setStatus;
@@ -87,7 +86,12 @@ function invalidateStream(): number {
   resizeDisplay = null;
   stopStream?.();
   stopStream = null;
+  reportSendProgress({ active: false, percent: 0, round: 1, emittedSymbols: 0, targetSymbols: 0 });
   return generation;
+}
+
+function reportSendProgress(detail: SendProgressDetail) {
+  window.dispatchEvent(new CustomEvent<SendProgressDetail>(SEND_PROGRESS_EVENT, { detail }));
 }
 
 /**
@@ -193,22 +197,6 @@ async function main() {
   snippetLabel.textContent = `发送文字 · 最大 ${MAX_SNIPPET_LABEL}`;
   filePickerLabel.textContent = `任意文件 · 最大 ${MAX_FILE_LABEL}`;
 
-  const setNumberOptions = (
-    select: HTMLSelectElement,
-    values: readonly number[],
-    selected: number,
-  ) => {
-    select.replaceChildren(
-      ...values.map((value) => {
-        const option = new Option(String(value));
-        option.selected = value === selected;
-        return option;
-      }),
-    );
-  };
-  setNumberOptions(cfgFps, TX_FPS_OPTIONS, DEFAULT_TX_FPS);
-  setNumberOptions(cfgBytes, FRAME_BYTES_OPTIONS, DEFAULT_FRAME_BYTES);
-
   // Browsers do not fire `change` when the same file is selected twice.
   // Clear only the picker value before opening it; the current QR stream keeps
   // playing if the dialog is cancelled, while re-selecting the file creates a
@@ -221,12 +209,17 @@ async function main() {
   for (const input of modeInputs) input.addEventListener("change", applyMode);
   applyMode();
   window.addEventListener("resize", onResize);
-  for (const el of [cfgFps, cfgBytes, cfgEcc, cfgSize]) {
-    el.addEventListener("change", () => void startStream());
-  }
+  window.addEventListener(SEND_SPEED_CHANGE_EVENT, onSpeedChange);
 }
 
 const onResize = () => resizeDisplay?.();
+const onSpeedChange = (event: Event) => {
+  const nextIndex = (event as CustomEvent<number>).detail;
+  if (Number.isInteger(nextIndex) && SEND_SPEED_PROFILES[nextIndex]) {
+    speedProfileIndex = nextIndex;
+  }
+  void startStream();
+};
 
 /** Only on a fresh pick — a settings change restarts the stream too, and
  *  yanking the page down every time you nudge tx fps is worse than useless. */
@@ -239,36 +232,42 @@ function scrollStageIntoView() {
 
 async function startStream(revealStage = false) {
   const gen = invalidateStream();
+  const speedProfile = SEND_SPEED_PROFILES[speedProfileIndex] ?? SEND_SPEED_PROFILES[DEFAULT_SPEED_PROFILE_INDEX]!;
   if (!selectedFile) {
     setStatus(
-      currentMode() === "snippet" ? "输入要发送的文字" : "选择文件开始",
+      `${speedProfile.label}档 · ${currentMode() === "snippet" ? "输入要发送的文字" : "选择文件开始"}`,
     );
     return;
   }
   const { name, size: fileSize, payload, compression, transmittedSize } = selectedFile;
   if (gen !== generation) return; // superseded while fetching
-  const txFps = Number(cfgFps.value);
-  const frameBytes = Number(cfgBytes.value);
-  const ecc = cfgEcc.value as "L" | "M" | "Q" | "H";
-  const displayPx = Number(cfgSize.value);
+  const txFps = speedProfile.txFps;
+  const frameBytes = speedProfile.frameBytes;
+  const ecc = "L" as const;
+  const displayPx = 900;
 
   const sessionId = (Math.floor(Math.random() * 0xffff) + 1) & 0xffff;
   const blockLen = blockLength(frameBytes);
-  // Keep selectedFile on this path — raising bytes/frame back up is the fix,
+  // Keep selectedFile on this path — raising the combined speed preset is the fix,
   // and dropping the pick would hide that.
   if (!fitsInOneStream(payload.length, frameBytes)) {
-    // Name a setting that is actually in the dropdown, not the bare minimum.
-    const offered = [...cfgBytes.options].map((option) => Number(option.value));
-    const suggestion =
-      smallestSufficientFrameSize(payload.length, offered) ?? minimumFrameBytes(payload.length);
+    const suggestion = SEND_SPEED_PROFILES.find((profile) =>
+      fitsInOneStream(payload.length, profile.frameBytes),
+    );
     showError(
       `${formatBytes(payload.length)} 需要 ` +
         `${sourceBlockCount(payload.length, frameBytes).toLocaleString()} 个数据块，` +
-        `已超过单次传输上限。请将每帧字节数提高到 ${suggestion} 或更高。`,
+        `已超过“${speedProfile.label}”档位上限。` +
+        (suggestion ? `请将传输速度调到“${suggestion.label}”。` : "请减小文件后重试。"),
     );
     return;
   }
   const encoder = new LTEncoder(payload, blockLen, sessionId);
+  const targetSymbols = Math.ceil(
+    encoder.k * expectedFountainOverhead(encoder.k) / QR_SYMBOLS_PER_TICK,
+  ) * QR_SYMBOLS_PER_TICK;
+  let emittedSymbols = 0;
+  reportSendProgress({ active: true, percent: 0, round: 1, emittedSymbols, targetSymbols });
   const header: FrameHeader = {
     sessionId,
     seq: 0,
@@ -338,7 +337,7 @@ async function startStream(revealStage = false) {
       // scroll target would be the wrong height.
       if (revealStage) scrollStageIntoView();
       setStatus(
-        `${QR_SYMBOLS_PER_TICK} QR · ${txFps * QR_SYMBOLS_PER_TICK} symbols/s · ` +
+        `${speedProfile.label} · ${QR_SYMBOLS_PER_TICK} QR · ${txFps * QR_SYMBOLS_PER_TICK} symbols/s · ` +
           `${txFps} 画面帧/s · 每码 ${frameBytes} 字节 · V${version} · ECC ${ecc} · ` +
           `${name} · ${formatBytes(fileSize)} · ` +
           `${compression === "gzip" ? `gzip 后 ${formatBytes(transmittedSize)}` : "未压缩"} · ` +
@@ -406,6 +405,16 @@ async function startStream(revealStage = false) {
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(staging, 0, 0, target.width, target.height);
     }
+    emittedSymbols += QR_SYMBOLS_PER_TICK;
+    const round = Math.floor((emittedSymbols - 1) / targetSymbols) + 1;
+    const emittedInRound = ((emittedSymbols - 1) % targetSymbols) + 1;
+    reportSendProgress({
+      active: true,
+      percent: emittedInRound / targetSymbols * 100,
+      round,
+      emittedSymbols: emittedInRound,
+      targetSymbols,
+    });
     schedulePump();
     nextAt += interval;
     if (now - nextAt > 3 * interval) nextAt = now + interval; // fell behind — don't burst
@@ -422,5 +431,6 @@ void main();
 return () => {
   invalidateStream();
   window.removeEventListener("resize", onResize);
+  window.removeEventListener(SEND_SPEED_CHANGE_EVENT, onSpeedChange);
 };
 }

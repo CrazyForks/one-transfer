@@ -22,10 +22,28 @@ import {
 } from "react-router-dom";
 
 import { Button, buttonVariants } from "@/components/ui/button";
+import { AppUpdateChecker } from "@/components/app-update-checker";
+import { BuildInfo } from "@/components/build-info";
 import { Card, CardContent } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { SweepShine } from "@/components/ui/sweep-shine";
+import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import {
+  DEFAULT_SPEED_PROFILE_INDEX,
+  QR_SYMBOLS_PER_TICK,
+  SEND_SPEED_CHANGE_EVENT,
+  SEND_SPEED_PROFILES,
+} from "../shared/send-settings";
+import { HEADER_LEN } from "../shared/protocol";
+import {
+  describeDeviceCapabilities,
+  recommendSpeedProfile,
+  recommendedProfileLabel,
+} from "../shared/device-profile";
+import { SEND_PROGRESS_EVENT, type SendProgressDetail } from "../shared/send-events";
+import { inspectDeviceCapabilities } from "@/lib/device-capabilities";
 
 type RouteKey = "home" | "send" | "receive" | "clipboard";
 
@@ -102,7 +120,7 @@ function Header({ route, transitionTo }: { route: RouteKey; transitionTo: (to: s
 
 function Footer() {
   return (
-    <footer className="relative z-10 flex min-h-14 items-center justify-center border-t border-black/[0.06] px-4 py-4 text-center">
+    <footer className="relative z-10 flex min-h-14 flex-wrap items-center justify-center gap-x-3 gap-y-1 border-t border-black/[0.06] px-4 py-4 text-center">
       <a
         href="https://github.com/zhihui-hu/one-transfer"
         target="_blank"
@@ -114,6 +132,9 @@ function Footer() {
         </svg>
         github.com/zhihui-hu/one-transfer
       </a>
+      <span className="text-xs font-medium text-zinc-400">
+        v{__APP_VERSION__} · {__APP_COMMIT__ === "development" ? "dev" : __APP_COMMIT__.slice(0, 7)}
+      </span>
     </footer>
   );
 }
@@ -273,16 +294,113 @@ function SendView() {
           ))}
         </div>
       </div>
-      <details data-reveal className="relative z-10 w-full rounded-2xl border border-black/[0.07] bg-white p-4 text-left">
-        <summary className="cursor-pointer text-center text-sm font-semibold text-zinc-600">高吞吐传输参数</summary>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <label className="grid gap-1 text-xs font-medium text-zinc-500">显示帧率<select id="cfg-fps" className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-zinc-900" /></label>
-          <label className="grid gap-1 text-xs font-medium text-zinc-500">每个 QR 字节数<select id="cfg-bytes" className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-zinc-900" /></label>
-          <label className="grid gap-1 text-xs font-medium text-zinc-500">QR 纠错级别<select id="cfg-ecc" defaultValue="L" className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-zinc-900"><option>L</option><option>M</option><option>Q</option><option>H</option></select></label>
-          <label className="grid gap-1 text-xs font-medium text-zinc-500">显示尺寸<input id="cfg-size" type="range" min="300" max="1200" step="50" defaultValue="900" /></label>
-        </div>
-      </details>
+      <SendBroadcastProgress />
+      <TransferSpeedControl />
     </main>
+  );
+}
+
+function TransferSpeedControl() {
+  const [index, setIndex] = useState(DEFAULT_SPEED_PROFILE_INDEX);
+  const [inspection, setInspection] = useState("正在检测处理器、内存、刷新率和可用画面尺寸…");
+  const manuallySelected = useRef(false);
+  const profile = SEND_SPEED_PROFILES[index]!;
+  const rawKiBPerSecond = Math.round(
+    QR_SYMBOLS_PER_TICK * profile.txFps * (profile.frameBytes - HEADER_LEN) / 1024,
+  );
+
+  const applySpeed = (nextIndex: number) => {
+    setIndex(nextIndex);
+    window.dispatchEvent(new CustomEvent<number>(SEND_SPEED_CHANGE_EVENT, { detail: nextIndex }));
+  };
+
+  const changeSpeed = ([nextIndex]: number[]) => {
+    if (nextIndex === undefined) return;
+    manuallySelected.current = true;
+    applySpeed(nextIndex);
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    void inspectDeviceCapabilities().then((capabilities) => {
+      if (cancelled) return;
+      const recommendation = recommendSpeedProfile(capabilities);
+      const label = recommendedProfileLabel(recommendation);
+      setInspection(
+        `${describeDeviceCapabilities(capabilities)}。推荐“${label}”：${recommendation.explanation}。` +
+          (manuallySelected.current ? " 已保留你的手动选择。" : " 已自动应用。"),
+      );
+      if (!manuallySelected.current) applySpeed(recommendation.profileIndex);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  return (
+    <section
+      id="cfg-speed"
+      data-speed-index={index}
+      data-reveal
+      className="relative z-10 w-full rounded-2xl border border-black/[0.07] bg-white p-5 text-left"
+    >
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-zinc-950">传输速度</p>
+          <p className="mt-1 text-xs text-zinc-500">自动选择当前电脑可承受的最高档位</p>
+        </div>
+        <output className="shrink-0 text-right text-sm font-semibold text-blue-600">
+          {profile.label} · 约 {rawKiBPerSecond} KiB/s
+        </output>
+      </div>
+      <Slider
+        className="mt-5"
+        value={[index]}
+        min={0}
+        max={SEND_SPEED_PROFILES.length - 1}
+        step={1}
+        aria-label="传输速度"
+        onValueChange={changeSpeed}
+      />
+      <div className="mt-2 flex justify-between text-xs font-medium text-zinc-400">
+        <span>最低</span>
+        <span>最高</span>
+      </div>
+      <p className="mt-4 text-xs leading-relaxed text-zinc-500" aria-live="polite">{inspection}</p>
+      <p className="mt-1 text-[11px] leading-relaxed text-zinc-400">
+        检测仅覆盖发送电脑；相机、远程桌面压缩和接收端性能不可见，识别不稳时请手动降档。
+      </p>
+    </section>
+  );
+}
+
+const idleSendProgress: SendProgressDetail = {
+  active: false,
+  percent: 0,
+  round: 1,
+  emittedSymbols: 0,
+  targetSymbols: 0,
+};
+
+function SendBroadcastProgress() {
+  const [progress, setProgress] = useState(idleSendProgress);
+
+  useEffect(() => {
+    const update = (event: Event) => {
+      setProgress((event as CustomEvent<SendProgressDetail>).detail);
+    };
+    window.addEventListener(SEND_PROGRESS_EVENT, update);
+    return () => window.removeEventListener(SEND_PROGRESS_EVENT, update);
+  }, []);
+
+  if (!progress.active) return null;
+  return (
+    <section className="relative z-10 w-full rounded-2xl border border-black/[0.07] bg-white p-4 text-left" aria-live="polite">
+      <div className="mb-2 flex items-center justify-between gap-3 text-xs">
+        <strong className="text-zinc-950">第 {progress.round} 轮广播 · {Math.floor(progress.percent)}%</strong>
+        <span className="text-zinc-500">{progress.emittedSymbols}/{progress.targetSymbols} symbols</span>
+      </div>
+      <Progress value={progress.percent} aria-label="发送广播进度" />
+      <p className="mt-2 text-[11px] text-zinc-400">表示一轮建议 symbol 已播放的比例；接收是否完成以接收端进度为准。</p>
+    </section>
   );
 }
 
@@ -584,6 +702,8 @@ function TransferLayout() {
         <Outlet context={{ transitionTo } satisfies RouteOutletContext} />
         <Footer />
       </div>
+      <BuildInfo />
+      <AppUpdateChecker />
     </>
   );
 }
