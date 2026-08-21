@@ -16,16 +16,44 @@ export interface PoolWorker {
 
 interface DecodeMessage {
   id: number;
-  bytes: Uint8Array | null;
+  /** First decoded symbol, kept for compatibility with older workers. */
+  bytes?: Uint8Array | null;
+  /** All valid symbols found in the submitted image. */
+  payloads?: Uint8Array[];
+  decodeMs?: number;
+  mode?: "fast" | "robust";
+}
+
+export interface DecodeWorkerReport {
+  decodeMs: number;
+  payloadCount: number;
+  mode: "fast" | "robust";
+}
+
+export interface DecodeWorkerPoolMetrics {
+  submitted: number;
+  dropped: number;
+  completed: number;
+  decodedPayloads: number;
+  totalDecodeMs: number;
+  averageDecodeMs: number;
+  robustAttempts: number;
 }
 
 export class DecodeWorkerPool {
   private readonly workers: PoolWorker[] = [];
   private readonly busy: boolean[] = [];
+  private submitted = 0;
+  private dropped = 0;
+  private completed = 0;
+  private decodedPayloads = 0;
+  private totalDecodeMs = 0;
+  private robustAttempts = 0;
 
   constructor(
     private readonly create: () => PoolWorker,
     private readonly onDecoded: (bytes: Uint8Array) => void,
+    private readonly onReport?: (report: DecodeWorkerReport) => void,
   ) {}
 
   get size(): number {
@@ -34,6 +62,27 @@ export class DecodeWorkerPool {
 
   get busyCount(): number {
     return this.busy.filter(Boolean).length;
+  }
+
+  get metrics(): DecodeWorkerPoolMetrics {
+    return {
+      submitted: this.submitted,
+      dropped: this.dropped,
+      completed: this.completed,
+      decodedPayloads: this.decodedPayloads,
+      totalDecodeMs: this.totalDecodeMs,
+      averageDecodeMs: this.completed > 0 ? this.totalDecodeMs / this.completed : 0,
+      robustAttempts: this.robustAttempts,
+    };
+  }
+
+  resetMetrics(): void {
+    this.submitted = 0;
+    this.dropped = 0;
+    this.completed = 0;
+    this.decodedPayloads = 0;
+    this.totalDecodeMs = 0;
+    this.robustAttempts = 0;
   }
 
   /** Grow or shrink in place. Terminating a busy worker just drops the frame it
@@ -47,10 +96,26 @@ export class DecodeWorkerPool {
       const slot = this.workers.length;
       const worker = this.create();
       worker.onmessage = (event: MessageEvent) => {
-        const { id, bytes } = event.data as DecodeMessage;
+        const { id, bytes, payloads, decodeMs, mode } = event.data as DecodeMessage;
         if (id === -1) return; // warm-up ping, no frame attached
         this.busy[slot] = false;
-        if (bytes) this.onDecoded(bytes);
+        const decoded = payloads ?? (bytes ? [bytes] : []);
+        const elapsed =
+          typeof decodeMs === "number" && Number.isFinite(decodeMs) && decodeMs >= 0
+            ? decodeMs
+            : 0;
+        const usedMode = mode === "robust" ? "robust" : "fast";
+        this.completed++;
+        this.decodedPayloads += decoded.length;
+        this.totalDecodeMs += elapsed;
+        if (usedMode === "robust") this.robustAttempts++;
+        const report: DecodeWorkerReport = {
+          decodeMs: elapsed,
+          payloadCount: decoded.length,
+          mode: usedMode,
+        };
+        this.onReport?.(report);
+        for (const payload of decoded) this.onDecoded(payload);
       };
       this.workers.push(worker);
       this.busy.push(false);
@@ -62,8 +127,12 @@ export class DecodeWorkerPool {
    *  worth less than the next one. */
   submit(message: unknown, transfer: Transferable[]): boolean {
     const slot = this.busy.indexOf(false);
-    if (slot === -1) return false;
+    if (slot === -1) {
+      this.dropped++;
+      return false;
+    }
     this.busy[slot] = true;
+    this.submitted++;
     this.workers[slot]!.postMessage(message, transfer);
     return true;
   }

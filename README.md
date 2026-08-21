@@ -349,9 +349,10 @@ Each QR frame contains a 20-byte little-endian header followed by one encoded bl
 | 16 | `u32` | Payload FNV-1a | Fast recovered-container check |
 | 20 | variable | Encoded block | Fountain XOR output |
 
-The default frame size is 2953 bytes, leaving a 2933-byte encoded block after the header. The default is
-60 FPS with QR error-correction level L. Difficult displays or cameras should reduce the frame size to
-1465 and the frame rate to 24 FPS.
+The default high-throughput layout displays four independently decodable QR symbols per visual tick.
+At 30 ticks per second and 1700 bytes per symbol, it emits 120 symbols per second; the 20-byte header
+leaves a 1680-byte encoded block in every symbol. QR error-correction level L is used. Difficult
+displays or cameras should reduce the frame size to 1465 and the visual tick rate to 24 per second.
 
 ### 5.4 Capture and Decode
 
@@ -360,7 +361,9 @@ The external receiver supports:
 - `getDisplayMedia` for direct window or screen capture;
 - `getUserMedia` for a phone or external camera;
 - Canvas downsampling before decoding large desktop frames;
-- a ZXing WASM worker pool;
+- a ZXing WASM worker pool that can return up to four symbols from one captured image;
+- a fast ZXing path on ordinary frames, with expensive rotate, invert, downscale, denoise, and
+  `tryHarder` searches enabled only as a sparse robust fallback after repeated misses;
 - frame dropping when all workers are busy;
 - generation counters that invalidate callbacks from stopped media streams.
 
@@ -444,16 +447,40 @@ practical limit is lower than the browser's theoretical memory ceiling.
 
 ### 8.2 Optical Channel
 
-Approximate useful throughput is:
+The sender displays four QR symbols at every 30 Hz visual tick. One captured image may therefore yield
+up to four independent fountain symbols:
 
 ```text
-goodput ≈ FPS × blockLength × decodeSuccessRate / fountainOverhead
+symbolsPerSecond = symbolsPerTick × ticksPerSecond
+rawKiB/s = symbolsPerSecond × (frameBytes - headerBytes) / 1024
+netKiB/s ≈ rawKiB/s × decodeSuccessRate / fountainOverhead
 ```
 
-At the default setting, `blockLength = 2953 - 20 = 2933` bytes. Real throughput depends on display
-refresh, tearing, exposure, autofocus, distance, ambient light, moiré patterns, decoder speed, and
-fountain redundancy. A denser QR frame is not always faster; lowering density and FPS often improves
-end-to-end goodput when recognition is unstable.
+The default values are `4 × 30 = 120` symbols/s and `blockLength = 1700 - 20 = 1680` bytes, for a
+raw payload ceiling of `196.875 KiB/s`. This is a model, not a benchmark. For example:
+
+| Decoded unique symbols | Fountain overhead | Estimated net goodput |
+|---:|---:|---:|
+| 100% | 1.15× | 171.2 KiB/s |
+| 75% | 1.20× | 123.0 KiB/s |
+| 50% | 1.30× | 75.7 KiB/s |
+
+Real throughput depends on display refresh, tearing, exposure, autofocus, distance, ambient light,
+moiré patterns, video compression, decoder speed, and fountain redundancy. The fast ZXing path avoids
+paying for difficult-image searches on every frame; a robust pass is attempted only after repeated fast
+misses. A denser QR frame is not always faster, and reducing density or tick rate can raise end-to-end
+goodput when recognition is unstable.
+
+The optical link is intentionally one-way, so the sender cannot perform feedback-based FPS adaptation.
+If a remote desktop or capture stream delivers fewer than 30 visual frames per second, the receiver sees
+missing or repeated symbols: completion takes longer, but LT recovery and the final checksum prevent a
+damaged file from being accepted. The receiver starts 2–4 decode workers from the available logical CPU
+count and can grow the pool when workers remain saturated. For a persistently weak image, the UI still
+allows an explicit 1465-byte / 24-tick fallback.
+
+The current wire protocol still uses the existing LT fountain code. RaptorQ is a future option for
+lower and more predictable recovery overhead, but adopting it requires a versioned protocol change and
+is not part of the present four-QR throughput update.
 
 The progress model does not use solved-block ratio alone because peeling cascades late. It combines
 unique frame count, estimated fountain overhead, and solved blocks, and never reports 100% before final
@@ -543,6 +570,7 @@ Automated coverage includes:
 - deterministic log, robust soliton distribution, and block-index generation;
 - LT recovery with out-of-order, duplicate, and 30% dropped frames;
 - frame capacity, display sizing, progress estimates, no-signal behavior, and worker lifecycle;
+- four-symbol throughput calculations, batched worker results, and decoder performance counters;
 - complete file and UTF-8 text round trips.
 
 A production check must also confirm that `dist/` contains one `index.html`, the service worker caches
@@ -557,7 +585,7 @@ replace.
 - Add clipboard chunking, sequence numbers, and per-segment checksums.
 - Add an optional approved encryption and sender-authentication layer.
 - Provide a signed PowerShell or executable Windows receiver.
-- Expose optical device presets and advanced settings in the UI.
+- Add measured device presets and optional sender/receiver feedback when a return channel is available.
 - Build a performance matrix across text channels, browsers, cameras, and displays.
 - Add browser-side directory packaging.
 
@@ -583,6 +611,9 @@ the underlying text clipboard and visible-screen channels.
 3. NIST FIPS PUB 180-4, *Secure Hash Standard (SHS)*.
 4. P. Deutsch, RFC 1952, *GZIP File Format Specification version 4.3*, 1996.
 5. W3C, *Media Capture and Streams* and *Screen Capture* specifications.
+6. `zxing-wasm`, [Reader API and decoding options](https://github.com/Sec-ant/zxing-wasm#reader-api).
+7. `zxing-cpp`, [WebAssembly performance notes](https://github.com/zxing-cpp/zxing-cpp/tree/master/wrappers/wasm).
+8. `RaptorQR`, [multi-QR optical-transfer implementation and benchmarks](https://github.com/infrost/RaptorQR).
 
 ## License
 

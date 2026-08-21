@@ -7,16 +7,30 @@
 export const NO_SIGNAL_HINT_FRAME_BYTES = 1465;
 export const NO_SIGNAL_HINT_TX_FPS = 24;
 
-export const DEFAULT_TX_FPS = 60;
-export const DEFAULT_FRAME_BYTES = 2953;
+/** Four independently decodable symbols are displayed on every visual tick. */
+export const QR_SYMBOLS_PER_TICK = 4;
+
+// Four V30 symbols at 30 display ticks/s are materially easier to capture than
+// one V40 symbol changing at 60 fps, while raising the aggregate symbol rate
+// from 60 to 120 symbols/s.
+export const DEFAULT_TX_FPS = 30;
+export const DEFAULT_FRAME_BYTES = 1700;
 
 // The hint values appear in these lists by construction, not by coincidence.
-export const TX_FPS_OPTIONS: readonly number[] = [10, 15, 20, NO_SIGNAL_HINT_TX_FPS, 30, DEFAULT_TX_FPS];
+export const TX_FPS_OPTIONS: readonly number[] = [
+  10,
+  15,
+  20,
+  NO_SIGNAL_HINT_TX_FPS,
+  DEFAULT_TX_FPS,
+  60,
+];
 export const FRAME_BYTES_OPTIONS: readonly number[] = [
   500,
   1000,
   NO_SIGNAL_HINT_FRAME_BYTES,
+  DEFAULT_FRAME_BYTES,
   1850,
   2331,
-  DEFAULT_FRAME_BYTES,
+  2953,
 ];

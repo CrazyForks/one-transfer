@@ -66,6 +66,8 @@ let settingsWired = false;
 let statsTimer: ReturnType<typeof setInterval> | undefined;
 let resultObjectUrl: string | null = null;
 let disposed = false;
+let lastAutoScaleDropCount = 0;
+let workersManuallySet = false;
 const finishedStreamKeys = new Set<string>();
 const intentionallyStoppedTracks = new WeakSet<MediaStreamTrack>();
 
@@ -73,6 +75,7 @@ const noSignal = new NoSignalHintTimer(NO_SIGNAL_AFTER_MS);
 const pool = new DecodeWorkerPool(createDecodeWorker, (bytes) => onDecoded(bytes));
 const captureTimes: number[] = [];
 const decodeTimes: number[] = [];
+let busyDropCount = 0;
 
 startBtn.onclick = () => void start("screen");
 cameraBtn.onclick = () => void start("camera");
@@ -224,12 +227,24 @@ async function start(source: "screen" | "camera") {
     `${source === "screen" ? "屏幕" : "相机"} ${settings?.width}×${settings?.height}@${settings?.frameRate} · 正在查找二维码…`,
   );
 
+  pool.resetMetrics();
+  busyDropCount = 0;
+  lastAutoScaleDropCount = 0;
+  workersManuallySet = false;
+  captureTimes.length = 0;
+  decodeTimes.length = 0;
+  const logicalCores = navigator.hardwareConcurrency || 4;
+  const suggestedWorkers = logicalCores >= 8 ? 4 : logicalCores >= 6 ? 3 : 2;
+  cfgWorkers.value = String(suggestedWorkers);
   pool.resize(Number(cfgWorkers.value));
   reportCaptureSettings();
   if (!settingsWired) {
     settingsWired = true;
     for (const el of [cfgWidth, cfgCapFps, cfgWorkers]) {
-      el.addEventListener("change", () => void applyReceiveSettings());
+      el.addEventListener("change", () => {
+        if (el === cfgWorkers) workersManuallySet = true;
+        void applyReceiveSettings();
+      });
     }
   }
 
@@ -248,8 +263,12 @@ function reportCaptureSettings() {
   const gotFps = Math.round(s.frameRate ?? 0);
   const fpsNote = gotFps && gotFps !== askedFps ? `（请求 ${askedFps}）` : "";
   const sourceLabel = captureSource === "screen" ? "共享屏幕" : "相机";
+  const decode = pool.metrics;
   captureActual.textContent =
-    `${sourceLabel} ${s.width}×${s.height} @ ${gotFps} fps${fpsNote} · 解码宽度 ${cfgWidth.value} · ${pool.size} 个线程`;
+    `${sourceLabel} ${s.width}×${s.height} @ ${gotFps} fps${fpsNote} · ` +
+    `解码宽度 ${cfgWidth.value} · ${pool.size} 个线程 · ` +
+    `平均解码 ${decode.averageDecodeMs.toFixed(1)} ms · ` +
+    `有效码 ${decode.decodedPayloads} · 忙碌丢帧 ${busyDropCount}`;
 }
 
 async function applyReceiveSettings() {
@@ -297,17 +316,36 @@ function captureFrame() {
   const vh = video.videoHeight;
   if (!vw || !vh) return;
   captureTimes.push(performance.now());
-  if (pool.busyCount === pool.size) return; // all busy — drop it, no harm done
+  if (pool.busyCount === pool.size) {
+    busyDropCount++;
+    return; // all busy — drop it, no harm done
+  }
+  // The sender displays a centered 2×2 square grid. Crop the camera/screen
+  // frame to its centered square before scaling so 16:9 captures do not spend
+  // ~44% of their pixel budget scanning guaranteed-empty side regions.
+  const sourceSize = Math.min(vw, vh);
+  const sourceX = Math.max(0, Math.floor((vw - sourceSize) / 2));
+  const sourceY = Math.max(0, Math.floor((vh - sourceSize) / 2));
   const maxWidth = Number(cfgWidth.value);
-  const scale = Math.min(1, maxWidth / vw);
-  const decodeWidth = Math.max(1, Math.round(vw * scale));
-  const decodeHeight = Math.max(1, Math.round(vh * scale));
+  const scale = Math.min(1, maxWidth / sourceSize);
+  const decodeWidth = Math.max(1, Math.round(sourceSize * scale));
+  const decodeHeight = decodeWidth;
   if (grab.width !== decodeWidth || grab.height !== decodeHeight) {
     grab.width = decodeWidth;
     grab.height = decodeHeight;
   }
   const ctx = grab.getContext("2d", { willReadFrequently: true })!;
-  ctx.drawImage(video, 0, 0, decodeWidth, decodeHeight);
+  ctx.drawImage(
+    video,
+    sourceX,
+    sourceY,
+    sourceSize,
+    sourceSize,
+    0,
+    0,
+    decodeWidth,
+    decodeHeight,
+  );
   const img = ctx.getImageData(0, 0, decodeWidth, decodeHeight);
   pool.submit(
     { id: frameId++, buf: img.data.buffer, w: decodeWidth, h: decodeHeight },
@@ -560,6 +598,19 @@ function updateStats() {
   const perSecond = (a: number[]) => a.length / (STATS_WINDOW_MS / 1000);
   metric("m-cap").textContent = perSecond(captureTimes).toFixed(0);
   metric("m-dec").textContent = perSecond(decodeTimes).toFixed(1);
+  const decode = pool.metrics;
+  const newBusyDrops = busyDropCount - lastAutoScaleDropCount;
+  if (!workersManuallySet && newBusyDrops >= 5 && pool.size < 4) {
+    pool.resize(pool.size + 1);
+    cfgWorkers.value = String(pool.size);
+  }
+  lastAutoScaleDropCount = busyDropCount;
+  metricsEl.dataset.decodeAverageMs = decode.averageDecodeMs.toFixed(2);
+  metricsEl.dataset.decodedPayloads = String(decode.decodedPayloads);
+  metricsEl.dataset.workerBusyDrops = String(busyDropCount + decode.dropped);
+  metricsEl.dataset.workerCompleted = String(decode.completed);
+  metricsEl.dataset.robustAttempts = String(decode.robustAttempts);
+  reportCaptureSettings();
   if (noSignal.tick(now)) showNoSignalHint();
   if (!decoder) return;
   const elapsed = (now - startTs) / 1000;

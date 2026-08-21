@@ -40,14 +40,16 @@ import {
   DEFAULT_FRAME_BYTES,
   DEFAULT_TX_FPS,
   FRAME_BYTES_OPTIONS,
+  QR_SYMBOLS_PER_TICK,
   TX_FPS_OPTIONS,
 } from "../shared/send-settings";
 
 const MARGIN = 4; // quiet-zone modules
-const LOOKAHEAD = 3;
+const LOOKAHEAD_BATCHES = 3;
 
 export function mountSend() {
-const canvas = document.getElementById("qr") as HTMLCanvasElement;
+const qrGrid = document.getElementById("qr-grid") as HTMLDivElement;
+const canvases = [...qrGrid.querySelectorAll<HTMLCanvasElement>("[data-qr-symbol]")];
 const stage = document.getElementById("stage") as HTMLDivElement;
 const specs = document.getElementById("specs")!;
 const cfgFile = document.getElementById("cfg-file") as HTMLInputElement;
@@ -74,10 +76,19 @@ let selectedFile: {
 } | null = null;
 let generation = 0; // bumped on every restart; stale loops see it and die
 let resizeDisplay: (() => void) | null = null;
+let stopStream: (() => void) | null = null;
 
 const specsLine = statusLine(specs);
 const setStatus = specsLine.setStatus;
 const showLoading = specsLine.showLoading;
+
+function invalidateStream(): number {
+  generation++;
+  resizeDisplay = null;
+  stopStream?.();
+  stopStream = null;
+  return generation;
+}
 
 /**
  * Errors also hide the stage — a stale QR stream pulsing away under a
@@ -98,7 +109,7 @@ function currentMode(): "file" | "snippet" {
 
 /** Switching what we're sending kills any stream in flight and clears the stage. */
 function applyMode(): void {
-  generation++;
+  invalidateStream();
   selectedFile = null;
   stage.hidden = true;
 
@@ -124,7 +135,7 @@ async function startSelection(
   status: string,
   prepare: () => Promise<{ name: string; size: number; packed: PackedOpticalFile }>,
 ): Promise<void> {
-  const selectionGeneration = ++generation;
+  const selectionGeneration = invalidateStream();
   selectedFile = null;
   stage.hidden = true;
   showLoading(status);
@@ -138,7 +149,9 @@ async function startSelection(
       compression: packed.compression,
       transmittedSize: packed.transmittedSize,
     };
-    await requestScreenWakeLock();
+    // Wake Lock is best-effort. Some browsers leave the permission request
+    // pending, so it must never hold the first QR batch behind that promise.
+    void requestScreenWakeLock();
     await startStream(true);
   } catch (error) {
     showError(error instanceof Error ? error.message : String(error));
@@ -225,8 +238,7 @@ function scrollStageIntoView() {
 }
 
 async function startStream(revealStage = false) {
-  const gen = ++generation;
-  resizeDisplay = null;
+  const gen = invalidateStream();
   if (!selectedFile) {
     setStatus(
       currentMode() === "snippet" ? "输入要发送的文字" : "选择文件开始",
@@ -270,7 +282,9 @@ async function startStream(revealStage = false) {
   let modules = 0;
   let scale = 1;
   const staging = document.createElement("canvas");
-  const queue: ImageData[] = [];
+  const stagingContext = staging.getContext("2d")!;
+  const canvasContexts = canvases.map((target) => target.getContext("2d")!);
+  const queue: ImageData[][] = [];
   let nextSeq = 0;
   stage.hidden = false;
 
@@ -284,20 +298,27 @@ async function startStream(revealStage = false) {
       Number.parseFloat(stageStyle.paddingRight) +
       Number.parseFloat(stageStyle.borderLeftWidth) +
       Number.parseFloat(stageStyle.borderRightWidth);
-    const cssBudget = fitQrDisplaySize(
+    const gridBudget = fitQrDisplaySize(
       window.innerWidth,
       window.innerHeight,
       containerWidth,
       displayPx,
       horizontalChrome,
     );
-    scale = Math.max(1, Math.floor((cssBudget * dpr) / total));
+    const gridStyle = getComputedStyle(qrGrid);
+    const gap = Number.parseFloat(gridStyle.columnGap) || 0;
+    const cellBudget = Math.max(1, (gridBudget - gap) / 2);
+    // Use enough backing pixels for the available CSS cell. The grid owns the
+    // responsive CSS size; the integer backing scale keeps module edges crisp.
+    scale = Math.max(1, Math.ceil((cellBudget * dpr) / total));
     staging.width = total;
     staging.height = total;
-    canvas.width = total * scale;
-    canvas.height = total * scale;
-    canvas.style.width = `${(total * scale) / dpr}px`;
-    canvas.style.height = `${(total * scale) / dpr}px`;
+    qrGrid.style.width = `${gridBudget}px`;
+    stage.style.width = `${gridBudget + horizontalChrome}px`;
+    for (const target of canvases) {
+      target.width = total * scale;
+      target.height = total * scale;
+    }
   };
 
   const makeFrame = (): ImageData => {
@@ -317,7 +338,8 @@ async function startStream(revealStage = false) {
       // scroll target would be the wrong height.
       if (revealStage) scrollStageIntoView();
       setStatus(
-        `${txFps} FPS · 每帧 ${frameBytes} 字节 · V${version} · ECC ${ecc} · ` +
+        `${QR_SYMBOLS_PER_TICK} QR · ${txFps * QR_SYMBOLS_PER_TICK} symbols/s · ` +
+          `${txFps} 画面帧/s · 每码 ${frameBytes} 字节 · V${version} · ECC ${ecc} · ` +
           `${name} · ${formatBytes(fileSize)} · ` +
           `${compression === "gzip" ? `gzip 后 ${formatBytes(transmittedSize)}` : "未压缩"} · ` +
           `K=${encoder.k}`,
@@ -327,20 +349,25 @@ async function startStream(revealStage = false) {
     return new ImageData(new Uint8ClampedArray(raster.pixels.buffer), raster.size, raster.size);
   };
 
+  const makeBatch = (): ImageData[] =>
+    Array.from({ length: QR_SYMBOLS_PER_TICK }, () => makeFrame());
+
   /**
-   * Refill the lookahead, generating at most `max` frames per call.
+ * Refill the lookahead, generating at most `max` four-symbol batches per call.
    *
    * Called once up front to fill the queue, then once per tick() — the only
    * thing that drains it. Self-scheduling on `setTimeout(pump, 0)` instead cost
-   * ~250 wake-ups a second doing nothing once the queue was full. Capping at
-   * one frame per tick keeps the amortisation that gave us: a rAF callback
-   * never pays for more than the single frame it just consumed.
+   * ~250 wake-ups a second doing nothing once the queue was full. After the
+   * initial fill, generation is deferred until after painting so a visual tick
+   * never waits for the next four QR symbols before reaching the screen.
    */
   let generatorFailed = false;
-  const pump = (max = LOOKAHEAD) => {
+  const pump = (max = LOOKAHEAD_BATCHES) => {
     if (generatorFailed || gen !== generation) return;
     try {
-      for (let n = 0; n < max && queue.length < LOOKAHEAD; n++) queue.push(makeFrame());
+      for (let n = 0; n < max && queue.length < LOOKAHEAD_BATCHES; n++) {
+        queue.push(makeBatch());
+      }
     } catch (err) {
       // e.g. frame bytes over capacity for the chosen ECC level
       generatorFailed = true;
@@ -351,33 +378,49 @@ async function startStream(revealStage = false) {
 
   const interval = 1000 / txFps;
   let nextAt = performance.now();
+  let animationFrameId = 0;
+  let pumpTimer: number | null = null;
+  const schedulePump = () => {
+    if (pumpTimer !== null || generatorFailed || gen !== generation) return;
+    pumpTimer = window.setTimeout(() => {
+      pumpTimer = null;
+      pump(1);
+    }, 0);
+  };
   const tick = (now: number) => {
     // generatorFailed means no frame will ever be produced again, so stop the
     // rAF loop rather than spinning on an empty queue until a settings change.
     if (gen !== generation || generatorFailed) return;
-    requestAnimationFrame(tick);
+    animationFrameId = requestAnimationFrame(tick);
     if (now < nextAt) return;
-    const img = queue.shift();
-    pump(1);
-    if (!img) {
+    const batch = queue.shift();
+    if (!batch) {
+      schedulePump();
       nextAt = now + interval;
       return;
     }
-    staging.getContext("2d")!.putImageData(img, 0, 0);
-    const ctx = canvas.getContext("2d")!;
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(staging, 0, 0, canvas.width, canvas.height);
+    for (let index = 0; index < QR_SYMBOLS_PER_TICK; index++) {
+      stagingContext.putImageData(batch[index]!, 0, 0);
+      const ctx = canvasContexts[index]!;
+      const target = canvases[index]!;
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(staging, 0, 0, target.width, target.height);
+    }
+    schedulePump();
     nextAt += interval;
     if (now - nextAt > 3 * interval) nextAt = now + interval; // fell behind — don't burst
   };
-  requestAnimationFrame(tick);
+  animationFrameId = requestAnimationFrame(tick);
+  stopStream = () => {
+    cancelAnimationFrame(animationFrameId);
+    if (pumpTimer !== null) window.clearTimeout(pumpTimer);
+  };
 }
 
 void main();
 
 return () => {
-  generation++;
-  resizeDisplay = null;
+  invalidateStream();
   window.removeEventListener("resize", onResize);
 };
 }

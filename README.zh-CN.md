@@ -340,9 +340,10 @@ LT（Luby Transform）喷泉码解决该问题：
 | 16 | `u32` | Payload FNV-1a | 容器快速完整性检查 |
 | 20 | 可变 | Encoded Block | XOR 后的喷泉码数据块 |
 
-默认每帧总字节数为 2953，因此编码块长度为 2933 字节；默认 60 FPS、QR 纠错级别 L。
-复杂屏幕、远距离或低质量相机可将每帧字节数降到 1465，并将帧率降到 24 FPS，以提高
-单帧识别率。
+默认高吞吐布局在每次画面更新中同时显示 4 个可独立解码的二维码。每秒更新 30 次、
+每码 1700 字节，因此每秒发出 120 个 symbol；扣除 20 字节帧头后，每码携带 1680 字节
+编码块。QR 纠错级别为 L。复杂屏幕、远距离或低质量相机可将每码字节数降到 1465，
+并将画面更新率降到 24 次/秒，以提高单码识别率。
 
 ### 5.4 二维码生成与接收
 
@@ -351,7 +352,10 @@ LT（Luby Transform）喷泉码解决该问题：
 - `getDisplayMedia`：接收端直接捕获包含动态二维码的窗口或屏幕。
 - `getUserMedia`：手机或其他设备使用相机扫描发送端屏幕。
 - Canvas 降采样：4K 屏幕帧先缩放到配置宽度，避免把无效像素送入解码器。
-- Worker 池：ZXing WASM 在独立 Worker 中解码；Worker 全忙时直接丢帧，喷泉码负责容错。
+- Worker 池：ZXing WASM 在独立 Worker 中解码，一张捕获画面最多返回 4 个 symbol。
+- Fast/Robust 双路径：普通帧关闭 `tryHarder`、旋转、反色、缩放和降噪搜索；连续快速
+  识别失败后才稀疏触发一次 Robust 回退，避免每帧支付完整搜索成本。
+- Worker 全忙时直接丢帧，喷泉码负责容错。
 - 代际计数器：停止并重启媒体流时使旧回调失效，防止僵尸捕获循环。
 
 恢复完成后先校验帧级 FNV-1a，再解析容器、按需解压并校验 SHA-256。只有全部检查通过，
@@ -447,15 +451,36 @@ B = 4 × ceil(N / 3)
 
 ### 8.2 光学通道
 
-忽略 QR 生成与显示损耗时，理论有效载荷吞吐可近似为：
+发送端每次 30 Hz 画面更新同时显示 4 个二维码，因此一张捕获画面最多可产生 4 个
+独立喷泉码 symbol。理论吞吐模型为：
 
 ```text
-goodput ≈ FPS × blockLength × decodeSuccessRate / fountainOverhead
+symbolsPerSecond = symbolsPerTick × ticksPerSecond
+rawKiB/s = symbolsPerSecond × (frameBytes - headerBytes) / 1024
+netKiB/s ≈ rawKiB/s × decodeSuccessRate / fountainOverhead
 ```
 
-默认参数下，`blockLength = 2953 - 20 = 2933` 字节。真实吞吐受屏幕刷新率、二维码跨刷新
-撕裂、相机曝光、自动对焦、距离、环境光、屏幕摩尔纹、WASM 解码能力和喷泉码冗余共同
-影响。提高单帧密度并不总能提高最终吞吐；当识别率下降时，降低密度和帧率通常更快。
+默认参数为 `4 × 30 = 120` symbols/s，`blockLength = 1700 - 20 = 1680` 字节，对应
+`196.875 KiB/s` 的原始载荷理论上限。这是模型而非实测结果。例如：
+
+| 不重复 symbol 解码率 | 喷泉码开销 | 估算净吞吐 |
+|---:|---:|---:|
+| 100% | 1.15× | 171.2 KiB/s |
+| 75% | 1.20× | 123.0 KiB/s |
+| 50% | 1.30× | 75.7 KiB/s |
+
+真实吞吐受屏幕刷新率、二维码跨刷新撕裂、相机曝光、自动对焦、距离、环境光、
+屏幕摩尔纹、视频压缩、WASM 解码能力和喷泉码冗余共同影响。Fast 路径避免每帧执行困难图像
+搜索，只在连续失败后稀疏执行 Robust 回退。提高单码密度并不总能提高最终吞吐；当
+识别率下降时，降低密度和画面更新率反而可能更快。
+
+光学链路是单向通道，因此发送端无法根据接收结果进行闭环帧率自适应。当远程桌面或采集流
+达不到 30 帧时，接收端会看到缺失或重复的 symbol：传输会变慢，但 LT 恢复与最终校验会
+阻止损坏文件被接受。接收端根据逻辑 CPU 数量默认启动 2～4 个解码 Worker，并在持续繁忙时
+自动扩容；图像质量长期不稳定时，仍可在页面中显式切换为 1465 字节 / 24 次更新的保守参数。
+
+当前线协议仍使用现有 LT 喷泉码。RaptorQ 可作为后续方向，以获得更低、更稳定的恢复开销，
+但它需要引入版本化协议变更，不属于本次 4 二维码高吞吐更新。
 
 进度条不直接使用“已解出的源块比例”，因为 peeling 解码会在后半段集中级联。实现综合
 不同帧数量、理论喷泉码开销和已解块数量，完成校验前最多显示 99%。
@@ -547,6 +572,7 @@ GitHub Pages。
 - 确定性对数、鲁棒孤子分布、块索引与跨会话差异。
 - LT 编解码、乱序、重复帧和 30% 随机丢帧恢复。
 - 帧容量上限、显示尺寸、进度估算、无信号提示与 Worker 池生命周期。
+- 四码吞吐模型、Worker 批量解码结果与性能计数器。
 - 文件与 UTF-8 文字的完整往返。
 
 生产构建还应确认：
@@ -565,7 +591,7 @@ GitHub Pages。
 - 为剪贴板协议增加分块、序号和分段校验，适配有单次文本长度限制的通道。
 - 为两条通道增加可选的组织批准加密层和发送方认证。
 - 在 Windows 端提供签名的 PowerShell/可执行接收器，减少批处理对环境编码的依赖。
-- 增加可见的光学参数面板和设备预设，而不是仅保留实现默认值。
+- 基于实测建立设备预设；在存在返回通道时，可选增加发送端与接收端的闭环反馈。
 - 建立不同文本通道、浏览器、摄像头和屏幕组合的吞吐基准矩阵。
 - 增加浏览器端目录打包，使目录传入不再依赖 Mac 辅助脚本。
 
@@ -590,6 +616,9 @@ One Transfer 为两类能力不同的通道定义了一套完整数据流：文�
 3. NIST FIPS PUB 180-4, *Secure Hash Standard (SHS)*.
 4. P. Deutsch, RFC 1952, *GZIP File Format Specification version 4.3*, 1996.
 5. W3C, *Media Capture and Streams* and *Screen Capture* specifications.
+6. `zxing-wasm`，[Reader API 与解码选项](https://github.com/Sec-ant/zxing-wasm#reader-api)。
+7. `zxing-cpp`，[WebAssembly 性能说明](https://github.com/zxing-cpp/zxing-cpp/tree/master/wrappers/wasm)。
+8. `RaptorQR`，[多二维码光传输实现与基准](https://github.com/infrost/RaptorQR)。
 
 ## License
 

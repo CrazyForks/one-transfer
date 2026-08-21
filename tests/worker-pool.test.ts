@@ -18,8 +18,12 @@ class FakeWorker implements PoolWorker {
   }
 
   /** Pretend the WASM decoder came back with something (or nothing). */
-  reply(bytes: Uint8Array | null, id = 0): void {
-    this.onmessage?.({ data: { id, bytes } } as MessageEvent);
+  reply(
+    bytes: Uint8Array | null,
+    id = 0,
+    extra: Record<string, unknown> = {},
+  ): void {
+    this.onmessage?.({ data: { id, bytes, ...extra } } as MessageEvent);
   }
 }
 
@@ -93,6 +97,73 @@ test("a worker that found no code still frees its slot", () => {
   created[0]!.reply(null);
   assert.equal(pool.busyCount, 0);
   assert.deepEqual(decoded, [], "no bytes, nothing to hand on");
+});
+
+test("a worker batch hands every decoded symbol to the consumer", () => {
+  const { pool, created, decoded } = harness();
+  pool.resize(1);
+  pool.submit(frame(1), []);
+  created[0]!.reply(new Uint8Array([0xaa]), 0, {
+    payloads: [new Uint8Array([1]), new Uint8Array([2]), new Uint8Array([3])],
+    decodeMs: 12.5,
+  });
+
+  assert.equal(pool.busyCount, 0);
+  assert.deepEqual(decoded, [
+    new Uint8Array([1]),
+    new Uint8Array([2]),
+    new Uint8Array([3]),
+  ]);
+  assert.deepEqual(pool.metrics, {
+    submitted: 1,
+    dropped: 0,
+    completed: 1,
+    decodedPayloads: 3,
+    totalDecodeMs: 12.5,
+    averageDecodeMs: 12.5,
+    robustAttempts: 0,
+  });
+});
+
+test("pool metrics include busy drops and robust decode reports", () => {
+  const reports: { decodeMs: number; payloadCount: number; mode: string }[] = [];
+  const created: FakeWorker[] = [];
+  const pool = new DecodeWorkerPool(
+    () => {
+      const worker = new FakeWorker(created.length);
+      created.push(worker);
+      return worker;
+    },
+    () => undefined,
+    (report) => reports.push(report),
+  );
+  pool.resize(1);
+
+  assert.equal(pool.submit(frame(1), []), true);
+  assert.equal(pool.submit(frame(2), []), false);
+  created[0]!.reply(null, 0, { decodeMs: 20, mode: "robust", payloads: [] });
+
+  assert.deepEqual(reports, [{ decodeMs: 20, payloadCount: 0, mode: "robust" }]);
+  assert.deepEqual(pool.metrics, {
+    submitted: 1,
+    dropped: 1,
+    completed: 1,
+    decodedPayloads: 0,
+    totalDecodeMs: 20,
+    averageDecodeMs: 20,
+    robustAttempts: 1,
+  });
+
+  pool.resetMetrics();
+  assert.deepEqual(pool.metrics, {
+    submitted: 0,
+    dropped: 0,
+    completed: 0,
+    decodedPayloads: 0,
+    totalDecodeMs: 0,
+    averageDecodeMs: 0,
+    robustAttempts: 0,
+  });
 });
 
 test("the warm-up ping is not mistaken for a finished frame", () => {

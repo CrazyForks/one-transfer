@@ -259,15 +259,29 @@ function SendView() {
         <textarea id="snippet-text" rows={7} placeholder="粘贴或输入文字" className="min-h-44 w-full resize-y rounded-2xl border border-black/10 bg-white p-4 text-left text-base leading-relaxed font-normal text-zinc-950 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10" />
         <Button id="send-snippet" type="button" className="mt-1 w-fit">开始发送</Button>
       </div>
-      <div className="stage relative z-10 max-w-full self-center overflow-hidden rounded-2xl bg-white p-4" id="stage" hidden>
-        <canvas id="qr" width="16" height="16" />
+      <div className="stage relative z-10 max-w-full self-center overflow-hidden rounded-2xl bg-white p-3 sm:p-4" id="stage" hidden>
+        <div id="qr-grid" className="qr-grid" aria-label="4 QR 高吞吐传输画面">
+          {Array.from({ length: 4 }, (_, index) => (
+            <canvas
+              key={index}
+              id={index === 0 ? "qr" : `qr-${index}`}
+              data-qr-symbol={index}
+              width="16"
+              height="16"
+              aria-label={`QR ${index + 1}`}
+            />
+          ))}
+        </div>
       </div>
-      <div className="internal-config" hidden aria-hidden="true">
-        <select id="cfg-fps" />
-        <select id="cfg-bytes" />
-        <select id="cfg-ecc" defaultValue="L"><option>L</option><option>M</option><option>Q</option><option>H</option></select>
-        <input id="cfg-size" type="range" min="300" max="1200" step="50" defaultValue="900" />
-      </div>
+      <details data-reveal className="relative z-10 w-full rounded-2xl border border-black/[0.07] bg-white p-4 text-left">
+        <summary className="cursor-pointer text-center text-sm font-semibold text-zinc-600">高吞吐传输参数</summary>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <label className="grid gap-1 text-xs font-medium text-zinc-500">显示帧率<select id="cfg-fps" className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-zinc-900" /></label>
+          <label className="grid gap-1 text-xs font-medium text-zinc-500">每个 QR 字节数<select id="cfg-bytes" className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-zinc-900" /></label>
+          <label className="grid gap-1 text-xs font-medium text-zinc-500">QR 纠错级别<select id="cfg-ecc" defaultValue="L" className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-zinc-900"><option>L</option><option>M</option><option>Q</option><option>H</option></select></label>
+          <label className="grid gap-1 text-xs font-medium text-zinc-500">显示尺寸<input id="cfg-size" type="range" min="300" max="1200" step="50" defaultValue="900" /></label>
+        </div>
+      </details>
     </main>
   );
 }
@@ -295,13 +309,19 @@ function ReceiveView() {
           </div>
         </div>
         <div id="result" />
-        <div className="internal-config" hidden aria-hidden="true">
-          <div id="metrics"><span id="m-cap">—</span><span id="m-dec">—</span><span id="m-rate">—</span><span id="m-time">—</span><span id="m-frames">—</span><span id="m-k">—</span><span id="m-block">—</span><span id="m-payload">—</span></div>
-          <select id="cfg-width" defaultValue="1280"><option>960</option><option>1280</option><option>1920</option></select>
-          <select id="cfg-capfps" defaultValue="60"><option>30</option><option>60</option></select>
-          <select id="cfg-workers" defaultValue="2"><option>1</option><option>2</option><option>3</option></select>
-          <span id="capture-actual" />
-        </div>
+        <details id="diagnostics" className="w-full rounded-2xl border border-black/[0.07] bg-white p-4 text-left" style={{ display: "none" }}>
+          <summary className="cursor-pointer text-center text-sm font-semibold text-zinc-600">解码性能与诊断</summary>
+          <div id="metrics" className="mt-4 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+            <span>捕获 FPS <strong id="m-cap">—</strong></span><span>有效码 FPS <strong id="m-dec">—</strong></span><span>净带宽 <strong id="m-rate">—</strong></span><span>耗时 <strong id="m-time">—</strong></span>
+            <span>新帧/重复 <strong id="m-frames">—</strong></span><span>数据块 K <strong id="m-k">—</strong></span><span>块大小 <strong id="m-block">—</strong></span><span>负载 <strong id="m-payload">—</strong></span>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <label className="grid gap-1 text-xs font-medium text-zinc-500">解码宽度<select id="cfg-width" defaultValue="1280" className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-zinc-900"><option>960</option><option>1280</option><option>1920</option></select></label>
+            <label className="grid gap-1 text-xs font-medium text-zinc-500">捕获 FPS<select id="cfg-capfps" defaultValue="60" className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-zinc-900"><option>30</option><option>60</option></select></label>
+            <label className="grid gap-1 text-xs font-medium text-zinc-500">Worker 数<select id="cfg-workers" defaultValue="2" className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-zinc-900"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
+          </div>
+          <span id="capture-actual" className="mt-3 block text-xs text-zinc-500" />
+        </details>
       </section>
     </main>
   );
