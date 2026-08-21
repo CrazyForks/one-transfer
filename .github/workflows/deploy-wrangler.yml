@@ -55,6 +55,6 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          gitHubToken: ${{ secrets.GH_TOKEN }}
           wranglerVersion: "4"
           command: pages deploy dist --project-name=one-transfer --branch=main --commit-hash=${{ github.sha }}

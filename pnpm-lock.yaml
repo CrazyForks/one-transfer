@@ -20,6 +20,9 @@ importers:
       '@radix-ui/react-tabs':
         specifier: ^1.1.21
         version: 1.1.21(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      base32768:
+        specifier: ^5.0.1
+        version: 5.0.1
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -1752,6 +1755,9 @@ packages:
   balanced-match@4.0.4:
     resolution: {integrity: sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA==}
     engines: {node: 18 || 20 || >=22}
+
+  base32768@5.0.1:
+    resolution: {integrity: sha512-m9WHBAnD1c9OrODuDsB+68na3E+ePIGaVgNocwKe39wyOwT0tJzBuVlGw0osyr3XNI6Q1kgm5inTW70rTEo9kQ==}
 
   baseline-browser-mapping@2.11.11:
     resolution: {integrity: sha512-/yImnXwyTvgMkhgekLHok/Rx5vO6E0BmStWlSqKWMVm2a2ITuZ1Tn+9bgLS+gZRdZmWtd8nxuhHpdmCUOWsTQQ==}
@@ -4461,6 +4467,8 @@ snapshots:
   balanced-match@1.0.2: {}
 
   balanced-match@4.0.4: {}
+
+  base32768@5.0.1: {}
 
   baseline-browser-mapping@2.11.11: {}
 
