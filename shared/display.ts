@@ -16,6 +16,10 @@ export interface IntegerQrGridLayout {
   gridCssPixels: number;
 }
 
+export function mediaAspectRatio(width?: number, height?: number): string {
+  return width && height && width > 0 && height > 0 ? `${width} / ${height}` : "";
+}
+
 /**
  * Keep every QR module on an integer number of physical display pixels.
  * Stretching a canvas to fill the last few CSS pixels makes module widths

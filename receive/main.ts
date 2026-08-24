@@ -28,6 +28,7 @@ import {
   verifyFile,
 } from "../shared/protocol";
 import { maximumFileBytes } from "../shared/frame-capacity";
+import { mediaAspectRatio } from "../shared/display";
 import { NO_SIGNAL_HINT_FRAME_BYTES, NO_SIGNAL_HINT_TX_FPS } from "../shared/send-settings";
 import { statusLine } from "../shared/status-line";
 import { requestScreenWakeLock } from "../shared/wake-lock";
@@ -101,6 +102,12 @@ function replaceResult(...nodes: (Node | string)[]) {
   result.replaceChildren(...nodes);
 }
 
+function updatePreviewAspect(settings?: MediaTrackSettings) {
+  const width = video.videoWidth || settings?.width || 0;
+  const height = video.videoHeight || settings?.height || 0;
+  preview.style.aspectRatio = mediaAspectRatio(width, height);
+}
+
 /** Put the page back the way it was so a refused or stopped capture can be
  * retried without reloading the receiver. */
 function offerRetry(message: string) {
@@ -119,6 +126,7 @@ function offerRetry(message: string) {
   cameraBtn.textContent = "使用相机";
   captureActions.style.display = "flex";
   preview.style.display = "none";
+  preview.style.aspectRatio = "";
   metricsEl.style.display = "none";
   if (diagnosticsEl) diagnosticsEl.style.display = "none";
   showError(message);
@@ -147,6 +155,7 @@ function stopCaptureForNavigation() {
   cameraBtn.textContent = "使用相机";
   captureActions.style.display = "flex";
   preview.style.display = "none";
+  preview.style.aspectRatio = "";
   metricsEl.style.display = "none";
   if (diagnosticsEl) diagnosticsEl.style.display = "none";
   setStatus("选择扫描方式开始");
@@ -223,6 +232,7 @@ async function start(source: "screen" | "camera") {
   await video.play().catch(() => undefined);
   const track = stream.getVideoTracks()[0];
   const settings = track?.getSettings();
+  updatePreviewAspect(settings);
   track?.addEventListener("ended", () => {
     if (track && intentionallyStoppedTracks.delete(track)) return;
     offerRetry(
@@ -299,6 +309,7 @@ async function applyReceiveSettings() {
       `${captureSource === "screen" ? "屏幕" : "相机"}无法应用帧率设置`;
     return;
   }
+  updatePreviewAspect(track.getSettings());
   reportCaptureSettings();
 }
 

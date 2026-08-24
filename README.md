@@ -491,8 +491,8 @@ Each QR frame contains a 20-byte little-endian header followed by one encoded bl
 | 20 | variable | Encoded block | Fountain XOR output |
 
 The high-throughput layout keeps four independently decodable QR symbols visible, but replaces only one
-cell on each visual tick. The Balanced preset emits 60 symbols per second at 1000 bytes per symbol; the
-20-byte header leaves a 980-byte encoded block. QR error-correction level L is used. A single shadcn/ui
+cell on each visual tick. The Balanced preset emits 60 symbols per second at 1465 bytes per symbol; the
+20-byte header leaves a 1445-byte encoded block. QR error-correction level L is used. A single shadcn/ui
 speed slider combines the frame-size and tick-rate choices into Stable, Balanced, and Fast presets;
 difficult displays or cameras should move it toward the minimum.
 
@@ -503,7 +503,7 @@ then applies the highest preset whose complete requirements are met:
 | Preset | Local recommendation boundary | Raw model |
 |---|---|---:|
 | Stable | Constrained CPU, refresh rate, or physical pixels | about 20 KiB/s |
-| Balanced | 4+ logical CPUs, about 45+ Hz, 1024px+ physical short edge | about 57 KiB/s |
+| Balanced | 4+ logical CPUs, about 45+ Hz, 1200px+ physical short edge | about 85 KiB/s |
 | Fast | 8+ logical CPUs, about 55+ Hz, 1800px+ physical short edge | about 135 KiB/s |
 
 Missing privacy-restricted values, such as `deviceMemory` in some browsers, do not automatically lower
@@ -517,9 +517,10 @@ The external receiver supports:
 
 - `getDisplayMedia` for direct window or screen capture;
 - `getUserMedia` for a phone or external camera;
+- a preview container that follows the track's actual aspect ratio instead of letterboxing portrait video;
 - Canvas downsampling before decoding large desktop frames;
-- a ZXing WASM worker pool that rotates ordinary frames through four overlapping grid regions and
-  searches one symbol at a time, with a whole-frame four-symbol robust fallback after repeated misses;
+- a ZXing WASM worker pool that searches the complete centred frame for up to four symbols on the fast
+  path, with rotate, invert, downscale, denoise, and `tryHarder` enabled only after repeated misses;
 - a fast ZXing path on ordinary frames, with expensive rotate, invert, downscale, denoise, and
   `tryHarder` searches enabled only as a sparse robust fallback after repeated misses;
 - frame dropping when all workers are busy;
@@ -617,14 +618,14 @@ rawKiB/s = symbolsPerSecond × (frameBytes - headerBytes) / 1024
 netKiB/s ≈ rawKiB/s × decodeSuccessRate / fountainOverhead
 ```
 
-The Balanced values are `1 × 60 = 60` symbols/s and `blockLength = 1000 - 20 = 980` bytes, for a
-raw payload ceiling of `57.421875 KiB/s`. This is a model, not a benchmark. For example:
+The Balanced values are `1 × 60 = 60` symbols/s and `blockLength = 1465 - 20 = 1445` bytes, for a
+raw payload ceiling of `84.66796875 KiB/s`. This is a model, not a benchmark. For example:
 
 | Decoded unique symbols | Fountain overhead | Estimated net goodput |
 |---:|---:|---:|
-| 100% | 1.15× | 49.9 KiB/s |
-| 75% | 1.20× | 35.9 KiB/s |
-| 50% | 1.30× | 22.1 KiB/s |
+| 100% | 1.15× | 73.6 KiB/s |
+| 75% | 1.20× | 52.9 KiB/s |
+| 50% | 1.30× | 32.6 KiB/s |
 
 Real throughput depends on display refresh, tearing, exposure, autofocus, distance, ambient light,
 moiré patterns, video compression, decoder speed, and fountain redundancy. The fast ZXing path avoids

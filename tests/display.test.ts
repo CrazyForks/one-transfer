@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { fitQrDisplaySize, integerQrGridLayout } from "../shared/display.ts";
+import {
+  fitQrDisplaySize,
+  integerQrGridLayout,
+  mediaAspectRatio,
+} from "../shared/display.ts";
 
 test("QR display fits inside its container including padding", () => {
   assert.equal(fitQrDisplaySize(1440, 1000, 720, 900, 40), 680);
@@ -28,4 +32,10 @@ test("four-QR cells use an integer number of physical pixels per module", () => 
 test("integer QR layout falls back safely for invalid device pixel ratios", () => {
   assert.equal(integerQrGridLayout(97, 100, 6, 0).modulePixels, 1);
   assert.throws(() => integerQrGridLayout(0, 100, 6, 1), /totalModules/);
+});
+
+test("camera preview follows the actual portrait or landscape track", () => {
+  assert.equal(mediaAspectRatio(960, 1280), "960 / 1280");
+  assert.equal(mediaAspectRatio(1920, 1080), "1920 / 1080");
+  assert.equal(mediaAspectRatio(0, 1080), "");
 });

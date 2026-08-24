@@ -46,7 +46,7 @@ export function recommendSpeedProfile(capabilities: DeviceCapabilities): SpeedRe
     capabilities.logicalCores >= 4 &&
     memorySupportsBalanced &&
     refreshSupportsBalanced &&
-    physicalShortEdge >= 1024
+    physicalShortEdge >= 1200
   ) {
     return {
       profileIndex: 1,

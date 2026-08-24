@@ -14,8 +14,8 @@ test("the default staggered four-QR layout produces 60 symbols per second", () =
   });
 
   assert.equal(estimate.symbolsPerSecond, 60);
-  assert.equal(estimate.blockBytes, 980);
-  assert.equal(estimate.rawKiBPerSecond, 57.421875);
+  assert.equal(estimate.blockBytes, 1445);
+  assert.equal(estimate.rawKiBPerSecond, 84.66796875);
   assert.equal(estimate.netKiBPerSecond, estimate.rawKiBPerSecond);
 });
 
@@ -37,7 +37,7 @@ test("net throughput accounts for decode loss and fountain redundancy", () => {
     fountainOverhead: 1.2,
   });
 
-  assert.equal(net, 35.888671875);
+  assert.equal(net, 52.91748046875);
 });
 
 test("invalid physical and link parameters are rejected", () => {

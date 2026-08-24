@@ -12,10 +12,10 @@ export const QR_GRID_CELLS = 4;
 export const QR_SYMBOLS_PER_TICK = 1;
 
 // One cell changes per refresh, so every QR remains stable for four display
-// cycles. V22 keeps the modules large enough for a camera while 60 updates/s
-// still produces materially more useful symbols than a dense, unreadable grid.
+// cycles. The widened integer-pixel grid keeps V27 camera-readable while
+// 60 updates/s restores the useful throughput of the earlier stream.
 export const DEFAULT_TX_FPS = 60;
-export const DEFAULT_FRAME_BYTES = 1000;
+export const DEFAULT_FRAME_BYTES = 1465;
 
 export interface SendSpeedProfile {
   label: string;
@@ -45,7 +45,7 @@ export const TX_FPS_OPTIONS: readonly number[] = [
 export const FRAME_BYTES_OPTIONS: readonly number[] = [
   500,
   NO_SIGNAL_HINT_FRAME_BYTES,
+  1000,
   DEFAULT_FRAME_BYTES,
-  1465,
   2331,
 ];

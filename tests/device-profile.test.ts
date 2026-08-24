@@ -21,7 +21,7 @@ test("a normal laptop receives the balanced profile", () => {
     logicalCores: 6,
     deviceMemoryGiB: 8,
     refreshRateHz: 60,
-    shortViewportEdge: 1080,
+    shortViewportEdge: 1200,
     devicePixelRatio: 1,
   }).profileIndex, 1);
 });
