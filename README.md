@@ -490,9 +490,9 @@ Each QR frame contains a 20-byte little-endian header followed by one encoded bl
 | 16 | `u32` | Payload FNV-1a | Fast recovered-container check |
 | 20 | variable | Encoded block | Fountain XOR output |
 
-The default high-throughput layout displays four independently decodable QR symbols per visual tick.
-At 30 ticks per second and 1700 bytes per symbol, it emits 120 symbols per second; the 20-byte header
-leaves a 1680-byte encoded block in every symbol. QR error-correction level L is used. A single shadcn/ui
+The high-throughput layout keeps four independently decodable QR symbols visible, but replaces only one
+cell on each visual tick. The Balanced preset emits 60 symbols per second at 1000 bytes per symbol; the
+20-byte header leaves a 980-byte encoded block. QR error-correction level L is used. A single shadcn/ui
 speed slider combines the frame-size and tick-rate choices into Stable, Balanced, and Fast presets;
 difficult displays or cameras should move it toward the minimum.
 
@@ -502,9 +502,9 @@ then applies the highest preset whose complete requirements are met:
 
 | Preset | Local recommendation boundary | Raw model |
 |---|---|---:|
-| Stable | Constrained CPU, refresh rate, or viewport | about 135 KiB/s |
-| Balanced | 4+ logical CPUs, about 45+ Hz, 540px+ short edge | about 197 KiB/s |
-| Fast | 8+ logical CPUs, about 55+ Hz, 720px+ short edge | about 271 KiB/s |
+| Stable | Constrained CPU, refresh rate, or physical pixels | about 20 KiB/s |
+| Balanced | 4+ logical CPUs, about 45+ Hz, 1024px+ physical short edge | about 57 KiB/s |
+| Fast | 8+ logical CPUs, about 55+ Hz, 1800px+ physical short edge | about 135 KiB/s |
 
 Missing privacy-restricted values, such as `deviceMemory` in some browsers, do not automatically lower
 the recommendation. The result and its evidence are shown under the slider. This inspection covers the
@@ -518,7 +518,8 @@ The external receiver supports:
 - `getDisplayMedia` for direct window or screen capture;
 - `getUserMedia` for a phone or external camera;
 - Canvas downsampling before decoding large desktop frames;
-- a ZXing WASM worker pool that can return up to four symbols from one captured image;
+- a ZXing WASM worker pool that rotates ordinary frames through four overlapping grid regions and
+  searches one symbol at a time, with a whole-frame four-symbol robust fallback after repeated misses;
 - a fast ZXing path on ordinary frames, with expensive rotate, invert, downscale, denoise, and
   `tryHarder` searches enabled only as a sparse robust fallback after repeated misses;
 - frame dropping when all workers are busy;
@@ -607,8 +608,8 @@ so the practical limit remains lower than the browser's theoretical memory ceili
 
 ### 8.2 Optical Channel
 
-The sender displays four QR symbols at every 30 Hz visual tick. One captured image may therefore yield
-up to four independent fountain symbols:
+The sender keeps four QR symbols visible but replaces only one on each visual tick. Every cell remains
+stable for four update periods, so a rolling-shutter transition cannot corrupt the whole grid at once:
 
 ```text
 symbolsPerSecond = symbolsPerTick × ticksPerSecond
@@ -616,14 +617,14 @@ rawKiB/s = symbolsPerSecond × (frameBytes - headerBytes) / 1024
 netKiB/s ≈ rawKiB/s × decodeSuccessRate / fountainOverhead
 ```
 
-The default values are `4 × 30 = 120` symbols/s and `blockLength = 1700 - 20 = 1680` bytes, for a
-raw payload ceiling of `196.875 KiB/s`. This is a model, not a benchmark. For example:
+The Balanced values are `1 × 60 = 60` symbols/s and `blockLength = 1000 - 20 = 980` bytes, for a
+raw payload ceiling of `57.421875 KiB/s`. This is a model, not a benchmark. For example:
 
 | Decoded unique symbols | Fountain overhead | Estimated net goodput |
 |---:|---:|---:|
-| 100% | 1.15× | 171.2 KiB/s |
-| 75% | 1.20× | 123.0 KiB/s |
-| 50% | 1.30× | 75.7 KiB/s |
+| 100% | 1.15× | 49.9 KiB/s |
+| 75% | 1.20× | 35.9 KiB/s |
+| 50% | 1.30× | 22.1 KiB/s |
 
 Real throughput depends on display refresh, tearing, exposure, autofocus, distance, ambient light,
 moiré patterns, video compression, decoder speed, and fountain redundancy. The fast ZXing path avoids
@@ -636,7 +637,7 @@ If a remote desktop or capture stream delivers fewer than 30 visual frames per s
 missing or repeated symbols: completion takes longer, but LT recovery and the final checksum prevent a
 damaged file from being accepted. The receiver starts 2–4 decode workers from the available logical CPU
 count and can grow the pool when workers remain saturated. For a persistently weak image, moving the
-single speed slider to its minimum selects the 1465-byte / 24-tick Stable preset.
+single speed slider to its minimum selects the 700-byte / 30-tick Stable preset.
 
 The current wire protocol still uses the existing LT fountain code. RaptorQ is a future option for
 lower and more predictable recovery overhead, but adopting it requires a versioned protocol change and

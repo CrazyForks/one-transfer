@@ -4,17 +4,18 @@
 // the sender doesn't offer.
 
 /** What the no-signal hint tells the user to turn the sender down to. */
-export const NO_SIGNAL_HINT_FRAME_BYTES = 1465;
-export const NO_SIGNAL_HINT_TX_FPS = 24;
+export const NO_SIGNAL_HINT_FRAME_BYTES = 700;
+export const NO_SIGNAL_HINT_TX_FPS = 30;
 
-/** Four independently decodable symbols are displayed on every visual tick. */
-export const QR_SYMBOLS_PER_TICK = 4;
+/** Four symbols stay visible, but only one changes on each display tick. */
+export const QR_GRID_CELLS = 4;
+export const QR_SYMBOLS_PER_TICK = 1;
 
-// Four V30 symbols at 30 display ticks/s are materially easier to capture than
-// one V40 symbol changing at 60 fps, while raising the aggregate symbol rate
-// from 60 to 120 symbols/s.
-export const DEFAULT_TX_FPS = 30;
-export const DEFAULT_FRAME_BYTES = 1700;
+// One cell changes per refresh, so every QR remains stable for four display
+// cycles. V22 keeps the modules large enough for a camera while 60 updates/s
+// still produces materially more useful symbols than a dense, unreadable grid.
+export const DEFAULT_TX_FPS = 60;
+export const DEFAULT_FRAME_BYTES = 1000;
 
 export interface SendSpeedProfile {
   label: string;
@@ -29,7 +30,7 @@ export const SEND_SPEED_PROFILES: readonly SendSpeedProfile[] = [
   { label: "高速", txFps: DEFAULT_TX_FPS, frameBytes: 2331 },
 ];
 
-export const DEFAULT_SPEED_PROFILE_INDEX = 1;
+export const DEFAULT_SPEED_PROFILE_INDEX = 0;
 export const SEND_SPEED_CHANGE_EVENT = "one-transfer:speed-change";
 
 // The hint values appear in these lists by construction, not by coincidence.
@@ -43,10 +44,8 @@ export const TX_FPS_OPTIONS: readonly number[] = [
 ];
 export const FRAME_BYTES_OPTIONS: readonly number[] = [
   500,
-  1000,
   NO_SIGNAL_HINT_FRAME_BYTES,
   DEFAULT_FRAME_BYTES,
-  1850,
+  1465,
   2331,
-  2953,
 ];

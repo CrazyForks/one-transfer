@@ -32,6 +32,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import {
   DEFAULT_SPEED_PROFILE_INDEX,
+  QR_GRID_CELLS,
   QR_SYMBOLS_PER_TICK,
   SEND_SPEED_CHANGE_EVENT,
   SEND_SPEED_PROFILES,
@@ -261,28 +262,30 @@ function FileSelectPanel({
 
 function SendView() {
   return (
-    <main data-route-page data-view="send" className={viewShell}>
-      <section data-reveal className="relative z-10 mb-4 w-full text-center">
+    <main data-route-page data-view="send" className={cn(viewShell, "max-w-[1200px] overflow-visible")}>
+      <section data-reveal className="relative z-10 mb-4 w-full max-w-[720px] text-center">
         <h1 id="tool-title" className={headingClass}>发送文件</h1>
         <p data-breathe className="mt-3.5 text-base text-zinc-500">选择内容后，二维码会自动开始播放。</p>
       </section>
-      <div data-reveal className="relative z-10 w-full"><SendModeTabs /></div>
-      <div className="status-line relative z-10 min-h-5 w-full text-center font-mono text-xs text-zinc-500" id="specs">选择文件开始</div>
-      <FileSelectPanel
-        panelId="pane-file"
-        inputId="cfg-file"
-        descriptionId="file-picker-label"
-        description="选择文件"
-        fileNameId="send-file-name"
-      />
-      <div id="pane-snippet" hidden className="relative z-10 grid w-full justify-items-center gap-2 text-sm font-semibold text-zinc-500">
+      <div data-reveal className="relative z-10 w-full max-w-[720px]"><SendModeTabs /></div>
+      <div className="status-line relative z-10 min-h-5 w-full max-w-[720px] text-center font-mono text-xs text-zinc-500" id="specs">选择文件开始</div>
+      <div className="w-full max-w-[720px]">
+        <FileSelectPanel
+          panelId="pane-file"
+          inputId="cfg-file"
+          descriptionId="file-picker-label"
+          description="选择文件"
+          fileNameId="send-file-name"
+        />
+      </div>
+      <div id="pane-snippet" hidden className="relative z-10 grid w-full max-w-[720px] justify-items-center gap-2 text-sm font-semibold text-zinc-500">
         <label htmlFor="snippet-text" id="snippet-label">发送文字</label>
         <textarea id="snippet-text" rows={7} placeholder="粘贴或输入文字" className="min-h-44 w-full resize-y rounded-2xl border border-black/10 bg-white p-4 text-left text-base leading-relaxed font-normal text-zinc-950 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10" />
         <Button id="send-snippet" type="button" className="mt-1 w-fit">开始发送</Button>
       </div>
-      <div className="stage relative z-10 max-w-full self-center overflow-hidden rounded-2xl bg-white p-3 sm:p-4" id="stage" hidden>
+      <div className="stage relative z-10 max-w-[calc(100vw-2rem)] self-center overflow-hidden rounded-2xl bg-white p-3 sm:p-4" id="stage" hidden>
         <div id="qr-grid" className="qr-grid" aria-label="4 QR 高吞吐传输画面">
-          {Array.from({ length: 4 }, (_, index) => (
+          {Array.from({ length: QR_GRID_CELLS }, (_, index) => (
             <canvas
               key={index}
               id={index === 0 ? "qr" : `qr-${index}`}
@@ -340,7 +343,7 @@ function TransferSpeedControl() {
       id="cfg-speed"
       data-speed-index={index}
       data-reveal
-      className="relative z-10 w-full rounded-2xl border border-black/[0.07] bg-white p-5 text-left"
+      className="relative z-10 w-full max-w-[720px] rounded-2xl border border-black/[0.07] bg-white p-5 text-left"
     >
       <div className="flex items-end justify-between gap-4">
         <div>
@@ -393,7 +396,7 @@ function SendBroadcastProgress() {
 
   if (!progress.active) return null;
   return (
-    <section className="relative z-10 w-full rounded-2xl border border-black/[0.07] bg-white p-4 text-left" aria-live="polite">
+    <section className="relative z-10 w-full max-w-[720px] rounded-2xl border border-black/[0.07] bg-white p-4 text-left" aria-live="polite">
       <div className="mb-2 flex items-center justify-between gap-3 text-xs">
         <strong className="text-zinc-950">第 {progress.round} 轮广播 · {Math.floor(progress.percent)}%</strong>
         <span className="text-zinc-500">{progress.emittedSymbols}/{progress.targetSymbols} symbols</span>

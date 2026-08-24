@@ -12,6 +12,7 @@ test("a capable desktop receives the fastest profile", () => {
     deviceMemoryGiB: 16,
     refreshRateHz: 60,
     shortViewportEdge: 900,
+    devicePixelRatio: 2,
   }).profileIndex, 2);
 });
 
@@ -20,7 +21,8 @@ test("a normal laptop receives the balanced profile", () => {
     logicalCores: 6,
     deviceMemoryGiB: 8,
     refreshRateHz: 60,
-    shortViewportEdge: 700,
+    shortViewportEdge: 1080,
+    devicePixelRatio: 1,
   }).profileIndex, 1);
 });
 
@@ -30,6 +32,7 @@ test("small or constrained devices fall back to stable", () => {
     deviceMemoryGiB: 16,
     refreshRateHz: 60,
     shortViewportEdge: 430,
+    devicePixelRatio: 1,
   }).profileIndex, 0);
 });
 
@@ -37,11 +40,12 @@ test("browser-hidden memory does not penalize an otherwise capable device", () =
   const capabilities = {
     logicalCores: 10,
     refreshRateHz: 60,
-    shortViewportEdge: 820,
+    shortViewportEdge: 900,
+    devicePixelRatio: 2,
   };
   assert.equal(recommendSpeedProfile(capabilities).profileIndex, 2);
   assert.equal(
     describeDeviceCapabilities(capabilities),
-    "10 线程 · 约 60 Hz · 画面短边 820px",
+    "10 线程 · 约 60 Hz · 画面短边 900px · 2× 像素密度",
   );
 });

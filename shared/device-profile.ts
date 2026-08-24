@@ -5,6 +5,7 @@ export interface DeviceCapabilities {
   deviceMemoryGiB?: number;
   refreshRateHz?: number;
   shortViewportEdge: number;
+  devicePixelRatio?: number;
 }
 
 export interface SpeedRecommendation {
@@ -18,6 +19,8 @@ export interface SpeedRecommendation {
  * visible slider remains the escape hatch for receiver-side camera limits.
  */
 export function recommendSpeedProfile(capabilities: DeviceCapabilities): SpeedRecommendation {
+  const physicalShortEdge =
+    capabilities.shortViewportEdge * Math.max(1, capabilities.devicePixelRatio ?? 1);
   const memorySupportsHigh =
     capabilities.deviceMemoryGiB === undefined || capabilities.deviceMemoryGiB >= 8;
   const refreshSupportsHigh =
@@ -27,7 +30,7 @@ export function recommendSpeedProfile(capabilities: DeviceCapabilities): SpeedRe
     capabilities.logicalCores >= 8 &&
     memorySupportsHigh &&
     refreshSupportsHigh &&
-    capabilities.shortViewportEdge >= 720
+    physicalShortEdge >= 1800
   ) {
     return {
       profileIndex: 2,
@@ -43,10 +46,10 @@ export function recommendSpeedProfile(capabilities: DeviceCapabilities): SpeedRe
     capabilities.logicalCores >= 4 &&
     memorySupportsBalanced &&
     refreshSupportsBalanced &&
-    capabilities.shortViewportEdge >= 540
+    physicalShortEdge >= 1024
   ) {
     return {
-      profileIndex: DEFAULT_SPEED_PROFILE_INDEX,
+      profileIndex: 1,
       explanation: "配置适合默认四码传输，兼顾二维码密度与识别稳定性",
     };
   }
@@ -66,6 +69,9 @@ export function describeDeviceCapabilities(capabilities: DeviceCapabilities): st
     facts.push(`约 ${capabilities.refreshRateHz} Hz`);
   }
   facts.push(`画面短边 ${capabilities.shortViewportEdge}px`);
+  if ((capabilities.devicePixelRatio ?? 1) > 1) {
+    facts.push(`${capabilities.devicePixelRatio}× 像素密度`);
+  }
   return facts.join(" · ");
 }
 

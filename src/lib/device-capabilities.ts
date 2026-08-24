@@ -9,6 +9,7 @@ export async function inspectDeviceCapabilities(): Promise<DeviceCapabilities> {
     deviceMemoryGiB: (navigator as NavigatorWithDeviceMemory).deviceMemory,
     refreshRateHz,
     shortViewportEdge: Math.round(Math.min(window.innerWidth, window.innerHeight)),
+    devicePixelRatio: window.devicePixelRatio || 1,
   };
 }
 

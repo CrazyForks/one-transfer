@@ -10,6 +10,7 @@ import {
   type ReaderOptions,
   type ReadResult,
 } from "zxing-wasm/reader";
+import { decodeRegionForFrame, type DecodeRegion } from "../shared/decode-regions";
 
 const MAX_SYMBOLS_PER_FRAME = 4;
 const ROBUST_FALLBACK_MISSES = 10;
@@ -19,7 +20,7 @@ const ROBUST_FALLBACK_MISSES = 10;
 // symbols cheaply, drop misses, and move on to the next video frame.
 const FAST_OPTIONS = {
   formats: ["QRCode"],
-  maxNumberOfSymbols: MAX_SYMBOLS_PER_FRAME,
+  maxNumberOfSymbols: 1,
   tryHarder: false,
   tryRotate: false,
   tryInvert: false,
@@ -31,6 +32,7 @@ const FAST_OPTIONS = {
 // compressed frames usable without charging every frame for these searches.
 const ROBUST_OPTIONS = {
   ...FAST_OPTIONS,
+  maxNumberOfSymbols: MAX_SYMBOLS_PER_FRAME,
   tryHarder: true,
   tryRotate: true,
   tryInvert: true,
@@ -59,13 +61,25 @@ function payloadsFrom(results: ReadResult[]): Uint8Array[] {
     .map((result) => Uint8Array.from(result.bytes));
 }
 
+function cropImageData(source: ImageData, region: DecodeRegion): ImageData {
+  const pixels = new Uint8ClampedArray(region.width * region.height * 4);
+  for (let row = 0; row < region.height; row++) {
+    const sourceStart = ((region.y + row) * source.width + region.x) * 4;
+    const sourceEnd = sourceStart + region.width * 4;
+    pixels.set(source.data.subarray(sourceStart, sourceEnd), row * region.width * 4);
+  }
+  return new ImageData(pixels, region.width, region.height);
+}
+
 ctx.onmessage = async (e: MessageEvent) => {
   const { id, buf, w, h } = e.data as { id: number; buf: ArrayBuffer; w: number; h: number };
   const startedAt = performance.now();
   let mode: "fast" | "robust" = "fast";
   try {
     const img = new ImageData(new Uint8ClampedArray(buf), w, h);
-    let payloads = payloadsFrom(await readBarcodes(img, FAST_OPTIONS));
+    const region = decodeRegionForFrame(id, w, h);
+    const regionImage = cropImageData(img, region);
+    let payloads = payloadsFrom(await readBarcodes(regionImage, FAST_OPTIONS));
     if (payloads.length > 0) {
       consecutiveFastMisses = 0;
     } else {

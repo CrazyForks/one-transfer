@@ -6,13 +6,13 @@
 //   combinations instead of letting four independent controls fight each other.
 // - The mask pattern is pinned (any declared mask is valid to a decoder);
 //   this skips the spec's 8-way mask evaluation and speeds generation ~4×.
-// - Displays need each frame shown for ≥2 refresh cycles or captures catch
-//   the transition; 24 fps on a 60 Hz screen is comfortable.
+// - Only one quadrant changes on each visual tick. The other three remain
+//   stable, so a rolling-shutter transition cannot corrupt the whole grid.
 // - Error correction stays at L by default: the fountain layer already
 //   handles erasures, and a frame is either decoded whole or discarded.
 
 import QRCode from "qrcode";
-import { fitQrDisplaySize } from "../shared/display";
+import { fitQrDisplaySize, integerQrGridLayout } from "../shared/display";
 import { rasterizeQr } from "../shared/qr-raster";
 import { formatBytes } from "../shared/format";
 import {
@@ -36,13 +36,14 @@ import { expectedFountainOverhead } from "../shared/progress";
 import { SEND_PROGRESS_EVENT, type SendProgressDetail } from "../shared/send-events";
 import {
   DEFAULT_SPEED_PROFILE_INDEX,
+  QR_GRID_CELLS,
   QR_SYMBOLS_PER_TICK,
   SEND_SPEED_CHANGE_EVENT,
   SEND_SPEED_PROFILES,
 } from "../shared/send-settings";
 
 const MARGIN = 4; // quiet-zone modules
-const LOOKAHEAD_BATCHES = 3;
+const LOOKAHEAD_SYMBOLS = 8;
 
 export function mountSend() {
 const qrGrid = document.getElementById("qr-grid") as HTMLDivElement;
@@ -264,7 +265,7 @@ async function startStream(revealStage = false) {
   const txFps = speedProfile.txFps;
   const frameBytes = speedProfile.frameBytes;
   const ecc = "L" as const;
-  const displayPx = 900;
+  const displayPx = 1200;
 
   const sessionId = (Math.floor(Math.random() * 0xffff) + 1) & 0xffff;
   const blockLen = blockLength(frameBytes);
@@ -303,7 +304,8 @@ async function startStream(revealStage = false) {
   const staging = document.createElement("canvas");
   const stagingContext = staging.getContext("2d")!;
   const canvasContexts = canvases.map((target) => target.getContext("2d")!);
-  const queue: ImageData[][] = [];
+  const visibleFrames: (ImageData | null)[] = canvases.map(() => null);
+  const queue: ImageData[] = [];
   let nextSeq = 0;
   stage.hidden = false;
 
@@ -332,19 +334,32 @@ async function startStream(revealStage = false) {
     );
     const gridStyle = getComputedStyle(qrGrid);
     const gap = Number.parseFloat(gridStyle.columnGap) || 0;
-    const cellBudget = Math.max(1, (gridBudget - gap) / 2);
-    // Use enough backing pixels for the available CSS cell. The grid owns the
-    // responsive CSS size; the integer backing scale keeps module edges crisp.
-    scale = Math.max(1, Math.ceil((cellBudget * dpr) / total));
+    const layout = integerQrGridLayout(total, gridBudget, gap, dpr);
+    scale = layout.modulePixels;
     staging.width = total;
     staging.height = total;
-    qrGrid.style.width = `${gridBudget}px`;
-    stage.style.width = `${gridBudget + horizontalChrome}px`;
+    qrGrid.style.width = `${layout.gridCssPixels}px`;
+    qrGrid.style.gridTemplateColumns = `repeat(2, ${layout.cellCssPixels}px)`;
+    stage.style.width = `${layout.gridCssPixels + horizontalChrome}px`;
     for (const target of canvases) {
       target.width = total * scale;
       target.height = total * scale;
+      target.style.width = `${layout.cellCssPixels}px`;
+      target.style.height = `${layout.cellCssPixels}px`;
     }
+    visibleFrames.forEach((frame, index) => {
+      if (frame) drawSymbol(index, frame);
+    });
   };
+
+  function drawSymbol(index: number, frame: ImageData) {
+    visibleFrames[index] = frame;
+    stagingContext.putImageData(frame, 0, 0);
+    const ctx = canvasContexts[index]!;
+    const target = canvases[index]!;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(staging, 0, 0, target.width, target.height);
+  }
 
   const makeFrame = (): ImageData => {
     const bytes = packFrame({ ...header, seq: nextSeq }, encoder.encode(nextSeq));
@@ -363,8 +378,9 @@ async function startStream(revealStage = false) {
       // scroll target would be the wrong height.
       if (revealStage) scrollStageIntoView();
       setStatus(
-        `${speedProfile.label} · ${QR_SYMBOLS_PER_TICK} QR · ${txFps * QR_SYMBOLS_PER_TICK} symbols/s · ` +
-          `${txFps} 画面帧/s · 每码 ${frameBytes} 字节 · V${version} · ECC ${ecc} · ` +
+        `${speedProfile.label} · ${QR_GRID_CELLS} QR 轮流刷新 · ` +
+          `${txFps * QR_SYMBOLS_PER_TICK} symbols/s · 每码约 ${txFps / QR_GRID_CELLS} 次/s · ` +
+          `${frameBytes} 字节 · V${version} · ${scale} px/模块 · ECC ${ecc} · ` +
           `${name} · ${formatBytes(fileSize)} · ` +
           `${compression === "gzip" ? `gzip 后 ${formatBytes(transmittedSize)}` : "未压缩"} · ` +
           `K=${encoder.k}`,
@@ -374,24 +390,22 @@ async function startStream(revealStage = false) {
     return new ImageData(new Uint8ClampedArray(raster.pixels.buffer), raster.size, raster.size);
   };
 
-  const makeBatch = (): ImageData[] =>
-    Array.from({ length: QR_SYMBOLS_PER_TICK }, () => makeFrame());
-
   /**
- * Refill the lookahead, generating at most `max` four-symbol batches per call.
+   * Refill the symbol lookahead. Generation happens after painting so the
+   * visual update never waits for the next QR to be encoded.
    *
    * Called once up front to fill the queue, then once per tick() — the only
    * thing that drains it. Self-scheduling on `setTimeout(pump, 0)` instead cost
    * ~250 wake-ups a second doing nothing once the queue was full. After the
    * initial fill, generation is deferred until after painting so a visual tick
-   * never waits for the next four QR symbols before reaching the screen.
+   * never waits for the next QR symbol before reaching the screen.
    */
   let generatorFailed = false;
-  const pump = (max = LOOKAHEAD_BATCHES) => {
+  const pump = (max = LOOKAHEAD_SYMBOLS) => {
     if (generatorFailed || gen !== generation) return;
     try {
-      for (let n = 0; n < max && queue.length < LOOKAHEAD_BATCHES; n++) {
-        queue.push(makeBatch());
+      for (let n = 0; n < max && queue.length < LOOKAHEAD_SYMBOLS; n++) {
+        queue.push(makeFrame());
       }
     } catch (err) {
       // e.g. frame bytes over capacity for the chosen ECC level
@@ -399,12 +413,24 @@ async function startStream(revealStage = false) {
       showError(err instanceof Error ? err.message : String(err));
     }
   };
+  const initialFrames = Array.from({ length: QR_GRID_CELLS }, () => makeFrame());
+  initialFrames.forEach((frame, index) => drawSymbol(index, frame));
+  emittedSymbols = initialFrames.length;
+  const emittedInInitialRound = ((emittedSymbols - 1) % targetSymbols) + 1;
+  reportSendProgress({
+    active: true,
+    percent: emittedInInitialRound / targetSymbols * 100,
+    round: Math.floor((emittedSymbols - 1) / targetSymbols) + 1,
+    emittedSymbols: emittedInInitialRound,
+    targetSymbols,
+  });
   pump();
 
   const interval = 1000 / txFps;
   let nextAt = performance.now();
   let animationFrameId = 0;
   let pumpTimer: number | null = null;
+  let nextCanvasIndex = 0;
   const schedulePump = () => {
     if (pumpTimer !== null || generatorFailed || gen !== generation) return;
     pumpTimer = window.setTimeout(() => {
@@ -417,20 +443,15 @@ async function startStream(revealStage = false) {
     // rAF loop rather than spinning on an empty queue until a settings change.
     if (gen !== generation || generatorFailed) return;
     animationFrameId = requestAnimationFrame(tick);
-    if (now < nextAt) return;
-    const batch = queue.shift();
-    if (!batch) {
+    if (now + 0.5 < nextAt) return;
+    const frame = queue.shift();
+    if (!frame) {
       schedulePump();
       nextAt = now + interval;
       return;
     }
-    for (let index = 0; index < QR_SYMBOLS_PER_TICK; index++) {
-      stagingContext.putImageData(batch[index]!, 0, 0);
-      const ctx = canvasContexts[index]!;
-      const target = canvases[index]!;
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(staging, 0, 0, target.width, target.height);
-    }
+    drawSymbol(nextCanvasIndex, frame);
+    nextCanvasIndex = (nextCanvasIndex + 1) % QR_GRID_CELLS;
     emittedSymbols += QR_SYMBOLS_PER_TICK;
     const round = Math.floor((emittedSymbols - 1) / targetSymbols) + 1;
     const emittedInRound = ((emittedSymbols - 1) % targetSymbols) + 1;
