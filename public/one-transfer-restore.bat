@@ -6,7 +6,7 @@ title One Transfer 通用文件还原
 echo.
 echo ========================================
 echo One Transfer 通用文件还原
-echo 当前协议：ONE_TRANSFER_V2 / Base32768 / Base91 / gzip / SHA-256
+echo 当前协议：ONE_TRANSFER_V2 / Base91 / gzip / SHA-256
 echo 向后兼容：ONE_TRANSFER_V1 / Base64
 echo ========================================
 echo.
@@ -14,7 +14,6 @@ echo.
 where powershell >nul 2>nul
 if errorlevel 1 (
   echo [失败] 当前 Windows 未找到 PowerShell，无法读取文本剪贴板。
-  pause
   exit /b 1
 )
 
@@ -23,18 +22,16 @@ set "RESTORE_DIR=%~dp0"
 
 echo 文件将保存到：%RESTORE_DIR%
 echo 正在读取文本剪贴板并校验还原文件...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $raw=[IO.File]::ReadAllText($env:RESTORE_SCRIPT,[Text.Encoding]::UTF8); $marker=('# ONE_TRANSFER_'+'POWERSHELL'); $offset=$raw.IndexOf($marker,[StringComparison]::Ordinal); if($offset -lt 0){throw '还原脚本缺少 PowerShell 主体。'}; Invoke-Expression $raw.Substring($offset+$marker.Length)"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; try{$raw=[IO.File]::ReadAllText($env:RESTORE_SCRIPT,[Text.Encoding]::UTF8); $marker=('# ONE_TRANSFER_'+'POWERSHELL'); $offset=$raw.IndexOf($marker,[StringComparison]::Ordinal); if($offset -lt 0){throw '还原脚本缺少 PowerShell 主体。'}; & ([ScriptBlock]::Create($raw.Substring($offset+$marker.Length)))}catch{$errorItem=$_.Exception; while($null -ne $errorItem){[Console]::Error.WriteLine('[PowerShell] '+$errorItem.Message); $errorItem=$errorItem.InnerException}; exit 1}"
 if errorlevel 1 (
   echo.
   echo [失败] 未能还原文件。
-  echo 请回到发送端重新复制；如果高密度 Unicode 被通道修改，请切换 ASCII 兼容模式。
-  pause
+  echo 请回到发送端重新选择文件或文件夹，并复制新的 ASCII 兼容数据。
   exit /b 1
 )
 
 echo.
 echo [完成] 文件已还原到脚本所在目录。
-pause
 exit /b 0
 
 # ONE_TRANSFER_POWERSHELL
@@ -48,38 +45,55 @@ using System.IO;
 public static class OneTransferTextCodec
 {
     private const int BitsPerCharacter = 15;
-    private static readonly Dictionary<char, int> Base32768Decode = new Dictionary<char, int>(32896);
     private const string Base91Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#$%&()*+,./:;<=>?@[]^_`{|}~\"";
-    private static readonly Dictionary<char, int> Base91Decode = new Dictionary<char, int>(91);
 
-    static OneTransferTextCodec()
+    private static Dictionary<char, int> CreateBase32768Decode()
     {
-        string[] pairStrings = {
-            "ҠҿԀԟڀڿݠޟ߀ߟကဟႠႿᄀᅟᆀᆟᇠሿበቿዠዿጠጿᎠᏟᐠᙟᚠᛟកសᠠᡟᣀᣟᦀᦟ᧠᧿ᨠᨿᯀᯟᰀᰟᴀᴟ⇠⇿⋀⋟⍀⏟␀␟─❟➀➿⠀⥿⦠⦿⨠⩟⪀⪿⫠⭟ⰀⰟⲀⳟⴀⴟⵀⵟ⺠⻟㇀㇟㐀䶟䷀龿ꀀꑿ꒠꒿ꔀꗿꙀꙟꚠꛟ꜀ꝟꞀꞟꡀꡟ",
-            "ƀƟɀʟ"
+        Dictionary<char, int> decode = new Dictionary<char, int>(32896);
+        int[][] repertoireRanges = {
+            new int[] {
+                0x04A0, 0x04BF, 0x0500, 0x051F, 0x0680, 0x06BF, 0x0760, 0x079F, 0x07C0, 0x07DF, 0x1000, 0x101F,
+                0x10A0, 0x10BF, 0x1100, 0x115F, 0x1180, 0x119F, 0x11E0, 0x123F, 0x1260, 0x127F, 0x12E0, 0x12FF,
+                0x1320, 0x133F, 0x13A0, 0x13DF, 0x1420, 0x165F, 0x16A0, 0x16DF, 0x1780, 0x179F, 0x1820, 0x185F,
+                0x18C0, 0x18DF, 0x1980, 0x199F, 0x19E0, 0x19FF, 0x1A20, 0x1A3F, 0x1BC0, 0x1BDF, 0x1C00, 0x1C1F,
+                0x1D00, 0x1D1F, 0x21E0, 0x21FF, 0x22C0, 0x22DF, 0x2340, 0x23DF, 0x2400, 0x241F, 0x2500, 0x275F,
+                0x2780, 0x27BF, 0x2800, 0x297F, 0x29A0, 0x29BF, 0x2A20, 0x2A5F, 0x2A80, 0x2ABF, 0x2AE0, 0x2B5F,
+                0x2C00, 0x2C1F, 0x2C80, 0x2CDF, 0x2D00, 0x2D1F, 0x2D40, 0x2D5F, 0x2EA0, 0x2EDF, 0x31C0, 0x31DF,
+                0x3400, 0x4D9F, 0x4DC0, 0x9FBF, 0xA000, 0xA47F, 0xA4A0, 0xA4BF, 0xA500, 0xA5FF, 0xA640, 0xA65F,
+                0xA6A0, 0xA6DF, 0xA700, 0xA75F, 0xA780, 0xA79F, 0xA840, 0xA85F
+            },
+            new int[] { 0x0180, 0x019F, 0x0240, 0x029F }
         };
-        for (int repertoire = 0; repertoire < pairStrings.Length; repertoire++)
+        for (int repertoire = 0; repertoire < repertoireRanges.Length; repertoire++)
         {
             int bitCount = BitsPerCharacter - 8 * repertoire;
             int value = 0;
-            string ranges = pairStrings[repertoire];
+            int[] ranges = repertoireRanges[repertoire];
             for (int index = 0; index < ranges.Length; index += 2)
             {
                 int first = ranges[index];
                 int last = ranges[index + 1];
                 for (int codePoint = first; codePoint <= last; codePoint++)
                 {
-                    Base32768Decode.Add((char)codePoint, (bitCount << 16) | value);
+                    decode[(char)codePoint] = (bitCount << 16) | value;
                     value++;
                 }
             }
         }
+        return decode;
+    }
+
+    private static Dictionary<char, int> CreateBase91Decode()
+    {
+        Dictionary<char, int> decode = new Dictionary<char, int>(91);
         for (int index = 0; index < Base91Alphabet.Length; index++)
-            Base91Decode.Add(Base91Alphabet[index], index);
+            decode[Base91Alphabet[index]] = index;
+        return decode;
     }
 
     public static byte[] DecodeBase32768(string text)
     {
+        Dictionary<char, int> decode = CreateBase32768Decode();
         byte[] output = new byte[(text.Length * BitsPerCharacter) / 8];
         int outputLength = 0;
         int currentByte = 0;
@@ -87,7 +101,7 @@ public static class OneTransferTextCodec
         for (int index = 0; index < text.Length; index++)
         {
             int entry;
-            if (!Base32768Decode.TryGetValue(text[index], out entry))
+            if (!decode.TryGetValue(text[index], out entry))
                 throw new InvalidDataException("Base32768 包含无法识别的字符，剪贴板可能已被修改。");
             int bitCount = entry >> 16;
             int value = entry & 0xffff;
@@ -99,6 +113,8 @@ public static class OneTransferTextCodec
                 currentBits++;
                 if (currentBits == 8)
                 {
+                    if (outputLength >= output.Length)
+                        throw new InvalidDataException("Base32768 解码长度异常，剪贴板或还原脚本可能已损坏。");
                     output[outputLength++] = (byte)currentByte;
                     currentByte = 0;
                     currentBits = 0;
@@ -115,6 +131,7 @@ public static class OneTransferTextCodec
 
     public static byte[] DecodeBase91(string text)
     {
+        Dictionary<char, int> decode = CreateBase91Decode();
         byte[] output = new byte[text.Length];
         int outputLength = 0;
         int queue = 0;
@@ -123,7 +140,7 @@ public static class OneTransferTextCodec
         for (int index = 0; index < text.Length; index++)
         {
             int decoded;
-            if (!Base91Decode.TryGetValue(text[index], out decoded))
+            if (!decode.TryGetValue(text[index], out decoded))
                 throw new InvalidDataException("Base91 包含无法识别的字符，剪贴板可能已被修改。");
             if (value < 0)
             {
@@ -208,13 +225,8 @@ function Restore-Transfer([string] $Content) {
         if ($expectedSha256 -notmatch '^[0-9a-f]{64}$') { throw '协议 SHA-256 字段无效。' }
         $name = [Uri]::UnescapeDataString($parts[6])
         $payload = $parts[7] -replace '\s', ''
-        if ($codec -eq 'b32768') {
-            [byte[]] $transmitted = [OneTransferTextCodec]::DecodeBase32768($payload)
-        } elseif ($codec -eq 'base91') {
-            [byte[]] $transmitted = [OneTransferTextCodec]::DecodeBase91($payload)
-        } else {
-            throw ('不支持的 V2 文本编码：' + $codec)
-        }
+        if ($codec -ne 'base91') { throw ('不支持的 V2 文本编码：' + $codec) }
+        [byte[]] $transmitted = [OneTransferTextCodec]::DecodeBase91($payload)
         if ($compression -eq 'gzip') {
             [byte[]] $bytes = Expand-GzipBounded $transmitted $originalSize
         } elseif ($compression -eq 'none') {

@@ -1,9 +1,7 @@
-import { decode as decodeBase32768, encode as encodeBase32768 } from "base32768";
-
 import { isPrecompressedType, MAX_FILE_BYTES, MAX_FILE_LABEL } from "./protocol";
 
 export type ClipboardTransferItemType = "file" | "directory";
-export type ClipboardTextCodec = "b32768" | "base91";
+export type ClipboardTextCodec = "base91";
 export type ClipboardCompression = "none" | "gzip";
 
 export interface EncodedClipboardTransfer {
@@ -60,7 +58,7 @@ export async function encodeClipboardTransfer(
   itemType: ClipboardTransferItemType,
   name: string,
   bytes: Uint8Array,
-  codec: ClipboardTextCodec = "b32768",
+  codec: ClipboardTextCodec = "base91",
   mediaType = "application/octet-stream",
 ): Promise<EncodedClipboardTransfer> {
   if (!isValidWindowsFileName(name)) throw new Error("文件名无法在 Windows 中使用。");
@@ -73,7 +71,7 @@ export async function encodeClipboardTransfer(
   const useGzip = compressed !== undefined && compressed.length + 64 < bytes.length;
   const transmitted = useGzip ? compressed : bytes;
   const compression: ClipboardCompression = useGzip ? "gzip" : "none";
-  const payload = codec === "b32768" ? encodeBase32768(transmitted) : encodeBase91(transmitted);
+  const payload = encodeBase91(transmitted);
   const encodedName = percentEncodeUtf8(name);
   const text = [
     "ONE_TRANSFER_V2",
@@ -104,7 +102,7 @@ export async function decodeClipboardTransfer(text: string): Promise<DecodedClip
   const itemType = parts[1];
   if (itemType !== "file" && itemType !== "directory") throw new Error("内容类型无效。");
   const codec = parts[2];
-  if (codec !== "b32768" && codec !== "base91") throw new Error("文本编码不受支持。");
+  if (codec !== "base91") throw new Error("文本编码不受支持。");
   const compression = parts[3];
   if (compression !== "none" && compression !== "gzip") throw new Error("压缩方式不受支持。");
   const originalSize = Number(parts[4]);
@@ -116,9 +114,7 @@ export async function decodeClipboardTransfer(text: string): Promise<DecodedClip
   const name = decodeURIComponent(parts[6]!);
   if (!isValidWindowsFileName(name)) throw new Error("文件名无法在 Windows 中使用。");
   const encodedPayload = parts[7]!.replace(/\s/g, "");
-  const transmitted = codec === "b32768"
-    ? decodeBase32768(encodedPayload)
-    : decodeBase91(encodedPayload);
+  const transmitted = decodeBase91(encodedPayload);
   const bytes = compression === "gzip"
     ? await gunzip(transmitted, originalSize)
     : transmitted;

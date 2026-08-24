@@ -234,12 +234,14 @@ function SendModeTabs() {
 function FileSelectPanel({
   panelId,
   inputId,
+  directoryInputId,
   descriptionId,
   description,
   fileNameId,
 }: {
   panelId?: string;
   inputId: string;
+  directoryInputId?: string;
   descriptionId?: string;
   description: string;
   fileNameId: string;
@@ -251,11 +253,27 @@ function FileSelectPanel({
       className="relative z-10 flex min-h-44 w-full flex-col items-center justify-center gap-4 rounded-2xl border border-black/[0.07] bg-white p-6 text-center"
     >
       <strong id={descriptionId} className="text-lg font-semibold">{description}</strong>
-      <label htmlFor={inputId} className={cn(buttonVariants({ variant: "outline" }), "cursor-pointer")}> 
-        <Upload />选择文件
-      </label>
+      <div className="flex flex-wrap items-center justify-center gap-2.5">
+        <label htmlFor={inputId} className={cn(buttonVariants({ variant: "outline" }), "cursor-pointer")}>
+          <Upload />选择文件
+        </label>
+        {directoryInputId ? (
+          <label htmlFor={directoryInputId} className={cn(buttonVariants({ variant: "outline" }), "cursor-pointer")}>
+            <Upload />选择文件夹
+          </label>
+        ) : null}
+      </div>
       <input id={inputId} className="sr-only" type="file" />
-      <span id={fileNameId} className="max-w-full truncate text-sm text-zinc-500">未选择文件</span>
+      {directoryInputId ? (
+        <input
+          id={directoryInputId}
+          className="sr-only"
+          type="file"
+          multiple
+          {...{ webkitdirectory: "", directory: "" }}
+        />
+      ) : null}
+      <span id={fileNameId} className="max-w-full truncate text-sm text-zinc-500">未选择文件或文件夹</span>
     </div>
   );
 }
@@ -521,50 +539,22 @@ function ClipboardView() {
   return (
     <main data-route-page data-view="clipboard" className={viewShell}>
       <section data-reveal className="relative z-10 mb-4 w-full text-center">
-        <h1 className={headingClass}>通过文本剪贴板传文件</h1>
-        <p data-breathe className="mt-3.5 text-base text-zinc-500">压缩并编码为高密度文本，再在 Windows 接收端校验还原。</p>
+        <h1 className={headingClass}>通过文本剪贴板传文件或文件夹</h1>
+        <p data-breathe className="mt-3.5 text-base text-zinc-500">文件夹会包含全部文件和层级，自动打包后复制到 Windows 还原。</p>
       </section>
-      <div data-reveal className="relative z-10 w-full"><ClipboardCodecTabs /></div>
-      <div className="status-line relative z-10 min-h-5 w-full text-center font-mono text-xs text-zinc-500" id="clipboard-status" aria-live="polite">请在发送端选择要传递的文件</div>
+      <div className="status-line relative z-10 min-h-5 w-full text-center font-mono text-xs text-zinc-500" id="clipboard-status" aria-live="polite">请选择要传递的文件或文件夹</div>
       <FileSelectPanel
         inputId="clipboard-file"
-        description="发送端 · 选择文件"
+        directoryInputId="clipboard-directory"
+        description="发送端 · 选择文件或文件夹"
         fileNameId="clipboard-file-name"
       />
       <div data-reveal className="relative z-10 flex w-full flex-col items-center gap-3.5 text-center">
-        <Button id="copy-transfer" type="button" disabled>复制文件数据到剪贴板</Button>
-        <span className="text-sm text-zinc-500">默认 Base32768 适合 UTF-16 剪贴板；遇到乱码或截断时切换 ASCII 兼容。</span>
+        <Button id="copy-transfer" type="button" disabled>复制数据到剪贴板</Button>
+        <span className="text-sm text-zinc-500">选择后自动复制；文件夹会打包全部文件并保留层级，Windows 端自动解压。</span>
       </div>
       <RestoreScriptPanel />
     </main>
-  );
-}
-
-function ClipboardCodecTabs() {
-  const [value, setValue] = useState("b32768");
-
-  const changeCodec = (nextValue: string) => {
-    setValue(nextValue);
-    const input = document.querySelector<HTMLInputElement>(
-      `input[name="clipboard-codec"][value="${nextValue}"]`,
-    );
-    if (input) {
-      input.checked = true;
-      input.dispatchEvent(new Event("change", { bubbles: true }));
-    }
-  };
-
-  return (
-    <>
-      <Tabs value={value} onValueChange={changeCodec}>
-        <TabsList className="w-full">
-          <TabsTrigger value="b32768" className="data-[state=active]:bg-white">高密度 Unicode</TabsTrigger>
-          <TabsTrigger value="base91" className="data-[state=active]:bg-white">ASCII 兼容</TabsTrigger>
-        </TabsList>
-      </Tabs>
-      <input hidden type="radio" name="clipboard-codec" value="b32768" defaultChecked />
-      <input hidden type="radio" name="clipboard-codec" value="base91" />
-    </>
   );
 }
 

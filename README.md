@@ -72,8 +72,8 @@ does not carry a file object.
 2. On the Windows receiver, download `one-transfer-restore.bat` once. Put the script in the directory
    where restored files should be written. The complete source is also visible on the page when direct
    download is inconvenient.
-3. Keep **High-density Unicode** selected first. It uses Base32768 and is normally the smallest choice
-   for Windows/RDP-style UTF-16 clipboard paths.
+3. The default is **ASCII Compatible** Base91 for Windows, RDP, and channels that may rewrite high
+   Unicode. Switch to **High-density Unicode** only when the channel preserves Unicode intact.
 4. Select a file. The browser reads it locally, computes SHA-256, tries gzip when appropriate, and shows:
    original size, compressed size, encoded character count, and the estimated reduction from V1 Base64.
 5. Click **Copy file data to clipboard**, then switch to the Windows session and wait for clipboard text

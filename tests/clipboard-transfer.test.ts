@@ -10,31 +10,18 @@ import {
   isValidWindowsFileName,
 } from "../shared/clipboard-transfer.ts";
 
-test("V2 defaults to Base32768 and round-trips Unicode filenames", async () => {
+test("V2 defaults to Base91 and round-trips Unicode filenames", async () => {
   const bytes = new Uint8Array([0, 1, 2, 127, 128, 255]);
   const encoded = await encodeClipboardTransfer("file", "报告 2026.bin", bytes);
 
-  assert.match(encoded.text, /^ONE_TRANSFER_V2\|file\|b32768\|none\|6\|[0-9a-f]{64}\|/);
+  assert.match(encoded.text, /^ONE_TRANSFER_V2\|file\|base91\|none\|6\|[0-9a-f]{64}\|/);
   const decoded = await decodeClipboardTransfer(encoded.text);
   assert.equal(decoded.name, "报告 2026.bin");
-  assert.equal(decoded.codec, "b32768");
+  assert.equal(decoded.codec, "base91");
   assert.deepEqual(decoded.bytes, bytes);
 });
 
-test("Base32768 uses about 40% as many payload characters as Base64", async () => {
-  const bytes = Uint8Array.from({ length: 15_000 }, (_, index) => (index * 73 + 19) & 0xff);
-  const encoded = await encodeClipboardTransfer(
-    "file",
-    "random.bin",
-    bytes,
-    "b32768",
-    "application/zip",
-  );
-  const base64Characters = 4 * Math.ceil(bytes.length / 3);
-  assert.ok(encoded.encodedCharacters < base64Characters * 0.42);
-});
-
-test("Base91 is the ASCII-compatible V2 fallback", async () => {
+test("Base91 is the ASCII-compatible V2 codec", async () => {
   const bytes = Uint8Array.from({ length: 4096 }, (_, index) => (index * 31) & 0xff);
   const encoded = await encodeClipboardTransfer(
     "file",

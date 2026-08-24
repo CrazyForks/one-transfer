@@ -70,8 +70,8 @@ pnpm check
 1. 在源设备打开 `#/clipboard`。
 2. 在 Windows 接收端首次下载 `one-transfer-restore.bat`，并把脚本放到希望保存文件的目录。
    如果通道不方便直接下载，页面也会显示完整源码，可以复制并保存为同名 BAT。
-3. 首先保留默认的 **高密度 Unicode**。它使用 Base32768，通常最适合 Windows/RDP 一类
-   UTF-16 文本剪贴板路径，生成字符数也最少。
+3. 默认使用 **ASCII 兼容** Base91，优先适配 Windows、RDP 和可能改写高位 Unicode 的
+   受限剪贴板通道；确认通道完整保留 Unicode 时，可切换 **高密度 Unicode** 减少字符数。
 4. 选择文件。浏览器只在本地读取文件，计算 SHA-256，按条件尝试 gzip，并显示原始大小、
    gzip 后大小、最终字符数以及相对 V1 Base64 的预计节省比例。
 5. 点击 **复制文件数据到剪贴板**，切换到 Windows 会话，等待远程剪贴板完成同步。
