@@ -654,9 +654,17 @@ one-transfer/
 ├── index.html                 # Minimal Vite entry and critical boot screen
 ├── src/
 │   ├── main.tsx               # React root and BrowserRouter
-│   ├── app.tsx                # Persistent routes, views, loading, and GSAP
+│   ├── app.tsx                # Application entry export
+│   ├── app/                   # Route table, persistent layout, navigation, and page motion
+│   ├── routes/
+│   │   ├── home/              # Home route
+│   │   ├── send/              # Send route and route-local components
+│   │   ├── receive/           # Receive route and immersive capture UI
+│   │   ├── clipboard/         # Clipboard route and restorer UI
+│   │   └── components/        # File selection shared by two routes
 │   ├── styles.css             # Chrome 109-compatible static and controller styles
 │   ├── components/            # Build info, update checker, and local components
+│   ├── hooks/                 # Cross-route controller lifecycle
 │   ├── lib/device-capabilities.ts # Browser capability inspection
 │   └── lib/utils.ts           # Class merging helper
 ├── send/main.ts               # Container creation, LT encoding, QR playback

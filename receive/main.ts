@@ -29,10 +29,13 @@ import {
 } from "../shared/protocol";
 import { maximumFileBytes } from "../shared/frame-capacity";
 import { mediaAspectRatio } from "../shared/display";
-import { NO_SIGNAL_HINT_FRAME_BYTES, NO_SIGNAL_HINT_TX_FPS } from "../shared/send-settings";
 import { statusLine } from "../shared/status-line";
 import { requestScreenWakeLock } from "../shared/wake-lock";
-import { RECEIVE_CAPTURE_CLOSE_EVENT } from "../shared/receive-events";
+import {
+  RECEIVE_CAPTURE_CLOSE_EVENT,
+  RECEIVE_CAPTURE_START_EVENT,
+  type ReceiveCaptureSource,
+} from "../shared/receive-events";
 
 export function mountReceive() {
 const startBtn = document.getElementById("start") as HTMLButtonElement;
@@ -48,7 +51,6 @@ const progressLabel = document.getElementById("progress-label")!;
 const etaLabel = document.getElementById("eta-label")!;
 const result = document.getElementById("result")!;
 const metricsEl = document.getElementById("metrics")!;
-const diagnosticsEl = document.getElementById("diagnostics") as HTMLDetailsElement | null;
 const cfgWidth = document.getElementById("cfg-width") as HTMLSelectElement;
 const cfgCapFps = document.getElementById("cfg-capfps") as HTMLSelectElement;
 const cfgWorkers = document.getElementById("cfg-workers") as HTMLSelectElement;
@@ -87,9 +89,11 @@ const captureTimes: number[] = [];
 const decodeTimes: number[] = [];
 let busyDropCount = 0;
 
-startBtn.onclick = () => void start("screen");
-cameraBtn.onclick = () => void start("camera");
+const onCaptureStart = (event: Event) => {
+  void start((event as CustomEvent<ReceiveCaptureSource>).detail);
+};
 const onCaptureDialogClose = () => stopCaptureForNavigation();
+window.addEventListener(RECEIVE_CAPTURE_START_EVENT, onCaptureStart);
 window.addEventListener(RECEIVE_CAPTURE_CLOSE_EVENT, onCaptureDialogClose);
 
 const { setStatus, showLoading, showError } = statusLine(stats);
@@ -131,7 +135,9 @@ function offerRetry(message: string) {
   preview.style.display = "none";
   preview.style.aspectRatio = "";
   metricsEl.style.display = "none";
-  if (diagnosticsEl) diagnosticsEl.style.display = "none";
+  progressEl.style.display = "none";
+  progressStatus.style.display = "none";
+  bar.style.width = "0";
   showError(message);
 }
 
@@ -160,7 +166,9 @@ function stopCaptureForNavigation() {
   preview.style.display = "none";
   preview.style.aspectRatio = "";
   metricsEl.style.display = "none";
-  if (diagnosticsEl) diagnosticsEl.style.display = "none";
+  progressEl.style.display = "none";
+  progressStatus.style.display = "none";
+  bar.style.width = "0";
   setStatus("选择扫描方式开始");
 }
 
@@ -230,7 +238,12 @@ async function start(source: "screen" | "camera") {
   captureActions.style.display = "none";
   preview.style.display = "block";
   metricsEl.style.display = "grid";
-  if (diagnosticsEl) diagnosticsEl.style.display = "block";
+  progressEl.style.display = "block";
+  progressStatus.style.display = "flex";
+  progressEl.setAttribute("aria-valuenow", "0");
+  bar.style.width = "0";
+  progressLabel.textContent = "0% · 等待二维码";
+  etaLabel.textContent = "正在查找二维码";
   video.srcObject = stream;
   await video.play().catch(() => undefined);
   const track = stream.getVideoTracks()[0];
@@ -551,38 +564,22 @@ function showNoSignalHint() {
   panel.setAttribute("role", "status");
 
   const heading = document.createElement("strong");
-  heading.textContent = "还没有识别到二维码";
-  const list = document.createElement("ul");
-  const captureTips =
-    captureSource === "screen"
-      ? [
-          "确认共享的屏幕或窗口中包含动态二维码。",
-          "放大二维码，并确保它没有被遮挡。",
-        ]
-      : [
-          "让二维码尽量填满画面，并保持设备稳定。",
-          "调高发送设备的屏幕亮度。",
-        ];
-  for (const line of [
-    ...captureTips,
-    `如果仍无法识别，请将发送端每帧字节数降到 ${NO_SIGNAL_HINT_FRAME_BYTES}。`,
-    `仍然无效时，将发送帧率降到 ${NO_SIGNAL_HINT_TX_FPS}。`,
-  ]) {
-    const item = document.createElement("li");
-    item.textContent = line;
-    list.append(item);
-  }
+  heading.textContent = "未识别到二维码";
+  const message = document.createElement("p");
+  message.textContent = captureSource === "screen"
+    ? "请确保共享画面包含完整二维码。"
+    : "请让二维码填满画面并保持稳定。";
 
   const dismiss = document.createElement("button");
   dismiss.type = "button";
   dismiss.className = "text-button no-signal-dismiss";
-  dismiss.textContent = "知道了";
+  dismiss.textContent = "隐藏";
   dismiss.addEventListener("click", () => {
     noSignal.dismiss(performance.now());
     replaceResult();
   });
 
-  panel.append(heading, list, dismiss);
+  panel.append(heading, message, dismiss);
   result.replaceChildren(panel);
 }
 
@@ -653,6 +650,7 @@ function updateStats() {
 
 return () => {
   disposed = true;
+  window.removeEventListener(RECEIVE_CAPTURE_START_EVENT, onCaptureStart);
   window.removeEventListener(RECEIVE_CAPTURE_CLOSE_EVENT, onCaptureDialogClose);
   stopCaptureForNavigation();
   if (resultObjectUrl) URL.revokeObjectURL(resultObjectUrl);

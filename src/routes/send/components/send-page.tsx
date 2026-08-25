@@ -1,0 +1,296 @@
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { gsap } from "gsap";
+
+import { SourceArchiveProgressDialog } from "@/components/source-archive-progress-dialog";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PAGE_HEADING, VIEW_SHELL } from "@/app/constants";
+import { inspectDeviceCapabilities } from "@/lib/device-capabilities";
+import { cn } from "@/lib/utils";
+import { FileSelectPanel } from "@/routes/components/file-select-panel";
+import {
+  describeDeviceCapabilities,
+  recommendSpeedProfile,
+  recommendedProfileLabel,
+} from "../../../../shared/device-profile";
+import { HEADER_LEN } from "../../../../shared/protocol";
+import { SEND_PROGRESS_EVENT, type SendProgressDetail } from "../../../../shared/send-events";
+import {
+  DEFAULT_SPEED_PROFILE_INDEX,
+  QR_GRID_CELLS,
+  QR_SYMBOLS_PER_TICK,
+  SEND_SPEED_CHANGE_EVENT,
+  SEND_SPEED_SYNC_EVENT,
+  SEND_SPEED_PROFILES,
+} from "../../../../shared/send-settings";
+
+function SendModeTabs() {
+  const [value, setValue] = useState("file");
+  const listRef = useRef<HTMLDivElement>(null);
+  const indicatorRef = useRef<HTMLSpanElement>(null);
+
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    const indicator = indicatorRef.current;
+    const trigger = list?.querySelector<HTMLElement>(`[data-tab-value="${value}"]`);
+    if (!list || !indicator || !trigger) return;
+    gsap.to(indicator, {
+      x: trigger.offsetLeft - 4,
+      width: trigger.offsetWidth,
+      duration: 0.14,
+      ease: "power3.out",
+      overwrite: "auto",
+    });
+  }, [value]);
+
+  const changeMode = (nextValue: string) => {
+    setValue(nextValue);
+    const input = document.querySelector<HTMLInputElement>(`input[name="send-mode"][value="${nextValue}"]`);
+    if (input) {
+      input.checked = true;
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    requestAnimationFrame(() => {
+      const pane = document.getElementById(nextValue === "snippet" ? "pane-snippet" : "pane-file");
+      if (!pane || pane.hidden) return;
+      gsap.fromTo(
+        pane,
+        { y: 4 },
+        { y: 0, duration: 0.16, ease: "power3.out", clearProps: "transform" },
+      );
+    });
+  };
+
+  return (
+    <>
+      <Tabs value={value} onValueChange={changeMode}>
+        <TabsList ref={listRef} className="app-style-25">
+          <span ref={indicatorRef} className="app-style-26" />
+          <TabsTrigger value="file" data-tab-value="file">文件</TabsTrigger>
+          <TabsTrigger value="snippet" data-tab-value="snippet">文字</TabsTrigger>
+        </TabsList>
+      </Tabs>
+      <input hidden type="radio" name="send-mode" value="file" defaultChecked />
+      <input hidden type="radio" name="send-mode" value="snippet" />
+    </>
+  );
+}
+
+export function SendPage() {
+  return (
+    <main data-route-page data-view="send" className={cn(VIEW_SHELL, "app-style-33")}>
+      <section data-reveal className="app-style-34">
+        <h1 id="tool-title" className={PAGE_HEADING}>发送文件</h1>
+        <p data-breathe className="app-style-35">选择内容后，二维码会自动开始播放。</p>
+      </section>
+      <div data-reveal className="app-style-36"><SendModeTabs /></div>
+      <div className="app-style-37" id="specs">选择文件开始</div>
+      <div className="app-style-38">
+        <FileSelectPanel
+          panelId="pane-file"
+          inputId="cfg-file"
+          directoryInputId="cfg-source-directory"
+          descriptionId="file-picker-label"
+          description="选择文件或前端/Python工程"
+          directoryControl={<SourceArchiveProgressDialog directoryInputId="cfg-source-directory" />}
+          fileNameId="send-file-name"
+        />
+      </div>
+      <div id="pane-snippet" hidden className="app-style-39">
+        <label htmlFor="snippet-text" id="snippet-label">发送文字</label>
+        <textarea id="snippet-text" rows={7} placeholder="粘贴或输入文字" className="app-style-40" />
+        <Button id="send-snippet" type="button" className="app-style-41">开始发送</Button>
+      </div>
+      <SendTransferDialog />
+    </main>
+  );
+}
+
+function SendTransferDialog() {
+  const [open, setOpen] = useState(false);
+  const [hasTransfer, setHasTransfer] = useState(false);
+  const activeRef = useRef(false);
+
+  useEffect(() => {
+    const update = (event: Event) => {
+      const detail = (event as CustomEvent<SendProgressDetail>).detail;
+      if (detail.active && !activeRef.current) setOpen(true);
+      activeRef.current = detail.active;
+      setHasTransfer(detail.active);
+      if (!detail.active) setOpen(false);
+    };
+    window.addEventListener(SEND_PROGRESS_EVENT, update);
+    return () => window.removeEventListener(SEND_PROGRESS_EVENT, update);
+  }, []);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      {hasTransfer ? <DialogTrigger asChild><Button type="button" variant="outline">查看二维码发送</Button></DialogTrigger> : null}
+      <DialogContent
+        persistent
+        className="send-transfer-dialog"
+      >
+        <DialogHeader className="app-style-43">
+          <DialogTitle className="app-style-44">二维码发送</DialogTitle>
+          <DialogDescription className="app-style-45">保持二维码完整可见；关闭弹窗后发送仍会在后台继续。</DialogDescription>
+        </DialogHeader>
+        <div id="qr-display-area" className="app-style-46">
+          <div className="app-style-47" id="stage" hidden>
+            <div id="qr-grid" className="qr-grid" aria-label="4 QR 高吞吐传输画面">
+              {Array.from({ length: QR_GRID_CELLS }, (_, index) => (
+                <canvas
+                  key={index}
+                  id={index === 0 ? "qr" : `qr-${index}`}
+                  data-qr-symbol={index}
+                  width="16"
+                  height="16"
+                  aria-label={`QR ${index + 1}`}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="app-style-48">
+          <SendBroadcastProgress compact />
+          <TransferSpeedControl compact />
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function TransferSpeedControl({ compact = false }: { compact?: boolean }) {
+  const [index, setIndex] = useState(DEFAULT_SPEED_PROFILE_INDEX);
+  const [inspection, setInspection] = useState("正在检测处理器、内存、刷新率和可用画面尺寸…");
+  const manuallySelected = useRef(false);
+  const profile = SEND_SPEED_PROFILES[index]!;
+  const rawKiBPerSecond = Math.round(
+    QR_SYMBOLS_PER_TICK * profile.txFps * (profile.frameBytes - HEADER_LEN) / 1024,
+  );
+
+  const applySpeed = (nextIndex: number) => {
+    setIndex(nextIndex);
+    window.dispatchEvent(new CustomEvent<number>(SEND_SPEED_CHANGE_EVENT, { detail: nextIndex }));
+  };
+
+  const selectSpeed = (nextIndex: number) => {
+    manuallySelected.current = true;
+    applySpeed(nextIndex);
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    void inspectDeviceCapabilities().then((capabilities) => {
+      if (cancelled) return;
+      const recommendation = recommendSpeedProfile(capabilities);
+      const label = recommendedProfileLabel(recommendation);
+      setInspection(
+        `${describeDeviceCapabilities(capabilities)}。推荐“${label}”：${recommendation.explanation}。` +
+          (manuallySelected.current ? " 已保留你的手动选择。" : " 已自动应用。"),
+      );
+      if (!manuallySelected.current) applySpeed(recommendation.profileIndex);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    const sync = (event: Event) => setIndex((event as CustomEvent<number>).detail);
+    window.addEventListener(SEND_SPEED_SYNC_EVENT, sync);
+    return () => window.removeEventListener(SEND_SPEED_SYNC_EVENT, sync);
+  }, []);
+
+  return (
+    <section
+      id="cfg-speed"
+      data-speed-index={index}
+      className={cn(
+        "app-style-49",
+        compact ? "app-style-50" : "app-style-51",
+      )}
+    >
+      <div className="app-style-52">
+        <div>
+          <p className="app-style-53">传输速度</p>
+          {!compact ? <p className="app-style-54">自动选择当前电脑可承受的最高档位</p> : null}
+        </div>
+        <output className="app-style-55">
+          {profile.label} · 约 {rawKiBPerSecond} KiB/s
+        </output>
+      </div>
+      <div
+        className={cn("speed-profile-buttons", compact && "is-compact")}
+        role="group"
+        aria-label="传输速度"
+      >
+        {SEND_SPEED_PROFILES.map((option, optionIndex) => {
+          const speed = Math.round(
+            QR_SYMBOLS_PER_TICK * option.txFps * (option.frameBytes - HEADER_LEN) / 1024,
+          );
+          return (
+            <button
+              key={option.label}
+              type="button"
+              className={cn("speed-profile-button", optionIndex === index && "is-active")}
+              aria-pressed={optionIndex === index}
+              onClick={() => selectSpeed(optionIndex)}
+            >
+              <strong>{option.label}</strong>
+              <span>约 {speed} KiB/s</span>
+            </button>
+          );
+        })}
+      </div>
+      {compact ? (
+        <p className="app-style-61" aria-live="polite">{inspection}</p>
+      ) : (
+        <>
+          <p className="app-style-62" aria-live="polite">{inspection}</p>
+          <p className="app-style-63">
+            检测仅覆盖发送电脑；相机、远程桌面压缩和接收端性能不可见，识别不稳时请手动降档。
+          </p>
+        </>
+      )}
+    </section>
+  );
+}
+
+const idleSendProgress: SendProgressDetail = {
+  active: false,
+  percent: 0,
+  round: 1,
+  emittedSymbols: 0,
+  targetSymbols: 0,
+};
+
+function SendBroadcastProgress({ compact = false }: { compact?: boolean }) {
+  const [progress, setProgress] = useState(idleSendProgress);
+
+  useEffect(() => {
+    const update = (event: Event) => {
+      setProgress((event as CustomEvent<SendProgressDetail>).detail);
+    };
+    window.addEventListener(SEND_PROGRESS_EVENT, update);
+    return () => window.removeEventListener(SEND_PROGRESS_EVENT, update);
+  }, []);
+
+  if (!progress.active) return null;
+  return (
+    <section className={cn("app-style-49", compact ? "app-style-64" : "app-style-65")} aria-live="polite">
+      <div className={cn("app-style-66", compact ? "app-style-67" : "app-style-68")}>
+        <strong className="app-style-69">第 {progress.round} 轮广播 · {Math.floor(progress.percent)}%</strong>
+        <span className="app-style-70">{progress.emittedSymbols}/{progress.targetSymbols} symbols</span>
+      </div>
+      <Progress value={progress.percent} aria-label="发送广播进度" />
+      <p className={cn("app-style-71", compact ? "app-style-59" : "app-style-72")}>一轮建议symbol播放比例；是否完成以接收端为准。</p>
+    </section>
+  );
+}

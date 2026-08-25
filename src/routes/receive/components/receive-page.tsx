@@ -1,0 +1,111 @@
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import { Settings2, X } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { PAGE_HEADING, VIEW_SHELL } from "@/app/constants";
+import {
+  RECEIVE_CAPTURE_CLOSE_EVENT,
+  RECEIVE_CAPTURE_START_EVENT,
+  type ReceiveCaptureSource,
+} from "../../../../shared/receive-events";
+
+export function ReceivePage() {
+  const [captureOpen, setCaptureOpen] = useState(false);
+  const [captureSettingsOpen, setCaptureSettingsOpen] = useState(false);
+
+  useEffect(() => {
+    if (!captureOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [captureOpen]);
+
+  const startCapture = (source: ReceiveCaptureSource) => {
+    setCaptureOpen(true);
+    window.dispatchEvent(new CustomEvent<ReceiveCaptureSource>(RECEIVE_CAPTURE_START_EVENT, { detail: source }));
+  };
+
+  const changeCaptureOpen = (next: boolean) => {
+    setCaptureOpen(next);
+    if (!next) {
+      setCaptureSettingsOpen(false);
+      window.dispatchEvent(new Event(RECEIVE_CAPTURE_CLOSE_EVENT));
+    }
+  };
+
+  return (
+    <main data-route-page data-view="receive" className={VIEW_SHELL}>
+      <section className="receiver-primary">
+        <div data-reveal className="app-style-73">
+          <h1 data-breathe className={PAGE_HEADING}>接收</h1>
+          <p className="app-style-35">选择扫描方式后，在全屏窗口中查看画面和接收进度。</p>
+        </div>
+        <div data-reveal className="app-style-74" id="capture-actions">
+          <Button id="start" type="button" className="app-style-75" onClick={() => startCapture("screen")}>扫描电脑屏幕</Button>
+          <Button id="start-camera" type="button" variant="outline" onClick={() => startCapture("camera")}>使用相机</Button>
+        </div>
+        {createPortal(<div
+          hidden={!captureOpen}
+          className="receive-capture-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-label="实时扫描"
+        >
+            <header className="receive-dialog-toolbar">
+              <button
+                type="button"
+                className="receive-toolbar-button"
+                aria-label="解码设置"
+                aria-expanded={captureSettingsOpen}
+                onClick={() => setCaptureSettingsOpen((current) => !current)}
+              >
+                <Settings2 />
+              </button>
+              <div className="receive-live-status" id="stats">正在启动扫描…</div>
+              <button
+                type="button"
+                className="receive-toolbar-button"
+                aria-label="停止扫描并关闭"
+                onClick={() => changeCaptureOpen(false)}
+              >
+                <X />
+              </button>
+            </header>
+            <section className="receive-settings-panel" hidden={!captureSettingsOpen} aria-label="解码设置">
+              <strong>解码设置</strong>
+              <div className="receive-settings-fields">
+                <label>解码宽度<select id="cfg-width" defaultValue="1280"><option>960</option><option>1280</option><option>1920</option></select></label>
+                <label>捕获 FPS<select id="cfg-capfps" defaultValue="60"><option>30</option><option>60</option></select></label>
+                <label>Worker数<select id="cfg-workers" defaultValue="2"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
+              </div>
+              <div className="receive-secondary-metrics">
+                <span>新帧/重复 <strong id="m-frames">—</strong></span><span>数据块 K <strong id="m-k">—</strong></span><span>块大小 <strong id="m-block">—</strong></span><span>负载 <strong id="m-payload">—</strong></span>
+              </div>
+              <span id="capture-actual" className="receive-capture-actual" />
+            </section>
+            <div className="app-style-81">
+              <div className="app-style-82" id="preview" style={{ display: "none" }}>
+                <video id="video" muted playsInline className="app-style-83" />
+              </div>
+            </div>
+            <div className="app-style-84 receive-controls-panel">
+              <div className="transfer-hud">
+                <div className="progress" id="progress" style={{ display: "none" }} role="progressbar" aria-label="接收进度" aria-valuemin={0} aria-valuemax={100} aria-valuenow={0}><div id="bar" /></div>
+                <div className="progress-status" id="progress-status" style={{ display: "none" }} aria-live="polite">
+                  <strong id="progress-label" className="app-style-85">0% · 0帧</strong>
+                  <span id="eta-label" className="app-style-86">正在估算时间</span>
+                </div>
+              </div>
+              <div id="metrics" className="receive-primary-metrics" style={{ display: "none" }}>
+                <span>捕获 FPS <strong id="m-cap">—</strong></span><span>有效码 FPS <strong id="m-dec">—</strong></span><span>净带宽 <strong id="m-rate">—</strong></span><span>耗时 <strong id="m-time">—</strong></span>
+              </div>
+              <div id="result" />
+            </div>
+        </div>, document.body)}
+      </section>
+    </main>
+  );
+}

@@ -4,7 +4,9 @@ import { BrowserRouter } from "react-router-dom";
 import { App } from "@/app";
 import "@/styles.css";
 
-const routerBasePath = new URL("../", import.meta.url).pathname.replace(/\/$/, "") || "/";
+const routerBasePath = import.meta.env.DEV
+  ? "/"
+  : new URL("../", import.meta.url).pathname.replace(/\/$/, "") || "/";
 
 if ("serviceWorker" in navigator) {
   const wasControlled = navigator.serviceWorker.controller !== null;

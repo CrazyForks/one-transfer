@@ -637,9 +637,17 @@ one-transfer/
 ├── index.html                 # 最小 Vite 入口与关键启动屏
 ├── src/
 │   ├── main.tsx               # React 根节点与 BrowserRouter
-│   ├── app.tsx                # 持久路由、页面、loading 与 GSAP
+│   ├── app.tsx                # 应用入口导出
+│   ├── app/                   # 路由表、持久 Layout、导航与页面动效
+│   ├── routes/
+│   │   ├── home/              # 首页路由
+│   │   ├── send/              # 发送页与路由私有组件
+│   │   ├── receive/           # 接收页与沉浸式扫描界面
+│   │   ├── clipboard/         # 剪贴板页与还原脚本界面
+│   │   └── components/        # 两个路由共用的文件选择组件
 │   ├── styles.css             # Chrome 109 兼容的静态 CSS 与控制器样式
 │   ├── components/            # 构建信息、更新检查与本地组件
+│   ├── hooks/                 # 跨路由控制器生命周期
 │   ├── lib/device-capabilities.ts # 浏览器设备能力检测
 │   └── lib/utils.ts           # class 合并工具
 ├── send/main.ts               # 文件/文字封装、LT 编码与 QR 播放
