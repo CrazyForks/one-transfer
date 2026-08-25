@@ -3045,6 +3045,10 @@ img.received {
   background: #f4f4f5;
 }
 
+.send-transfer-dialog[data-state="closed"] {
+  display: none !important;
+}
+
 .receive-capture-dialog {
   position: fixed;
   inset: 0;
