@@ -74,6 +74,30 @@ function revokeSourceArchiveDownload(): void {
   sourceArchiveDownloadUrl = null;
 }
 
+function clearClipboardSelection(preserveArchiveDialog = false): void {
+  processingAbortController?.abort();
+  processingAbortController = null;
+  generation++;
+  payload = null;
+  selectedName = "";
+  selected = null;
+  fileInput.value = "";
+  directoryInput.value = "";
+  projectDirectoryInput.value = "";
+  fileNameLabel.textContent = "未选择文件或文件夹";
+  copyButton.disabled = true;
+  copyButton.textContent = "复制数据到剪贴板";
+  nextStep.hidden = true;
+  status.setStatus("请选择要传递的文件或文件夹");
+  revokeSourceArchiveDownload();
+  clearTimeout(toastTimer);
+  toast.classList.remove("show");
+  toast.setAttribute("aria-hidden", "true");
+  if (!preserveArchiveDialog) {
+    reportSourceArchive({ state: "idle", percent: 0, message: "" });
+  }
+}
+
 const onSourceArchiveOptions = (event: Event) => {
   sourceArchiveOptions = (event as CustomEvent<SourceArchiveOptionsDetail>).detail;
 };
@@ -414,21 +438,9 @@ async function copyTransfer(
   }
 }
 
-fileInput.addEventListener("click", () => {
-  fileInput.value = "";
-  directoryInput.value = "";
-  projectDirectoryInput.value = "";
-});
-directoryInput.addEventListener("click", () => {
-  directoryInput.value = "";
-  fileInput.value = "";
-  projectDirectoryInput.value = "";
-});
-projectDirectoryInput.addEventListener("click", () => {
-  projectDirectoryInput.value = "";
-  fileInput.value = "";
-  directoryInput.value = "";
-});
+fileInput.addEventListener("click", () => clearClipboardSelection());
+directoryInput.addEventListener("click", () => clearClipboardSelection());
+projectDirectoryInput.addEventListener("click", () => clearClipboardSelection(true));
 fileInput.addEventListener("change", () => void prepareFile());
 directoryInput.addEventListener("change", () => void prepareDirectory());
 projectDirectoryInput.addEventListener("change", () => void prepareProjectDirectory());

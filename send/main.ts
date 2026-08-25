@@ -136,6 +136,22 @@ function revokeSourceArchiveDownload(): void {
   sourceArchiveDownloadUrl = null;
 }
 
+function clearFileSelection(preserveArchiveDialog = false): void {
+  sourceArchiveAbortController?.abort();
+  sourceArchiveAbortController = null;
+  revokeSourceArchiveDownload();
+  invalidateStream();
+  selectedFile = null;
+  stage.hidden = true;
+  cfgFile.value = "";
+  cfgSourceDirectory.value = "";
+  fileNameLabel.textContent = "未选择文件或文件夹";
+  setStatus("选择文件开始");
+  if (!preserveArchiveDialog) {
+    reportSourceArchive({ state: "idle", percent: 0, message: "" });
+  }
+}
+
 function reportSourceArchive(detail: SourceArchiveProgressDetail): void {
   window.dispatchEvent(new CustomEvent<SourceArchiveProgressDetail>(SOURCE_ARCHIVE_PROGRESS_EVENT, { detail }));
 }
@@ -331,18 +347,11 @@ async function main() {
   snippetLabel.textContent = `发送文字 · 最大 ${MAX_SNIPPET_LABEL}`;
   updateFileLimitLabel();
 
-  // Browsers do not fire `change` when the same file is selected twice.
-  // Clear only the picker value before opening it; the current QR stream keeps
-  // playing if the dialog is cancelled, while re-selecting the file creates a
-  // fresh payload and session.
-  cfgFile.addEventListener("click", () => {
-    cfgFile.value = "";
-    cfgSourceDirectory.value = "";
-  });
-  cfgSourceDirectory.addEventListener("click", () => {
-    cfgSourceDirectory.value = "";
-    cfgFile.value = "";
-  });
+  // Opening any picker immediately clears the old transfer. Cancelling the
+  // system picker therefore leaves an honest empty state instead of silently
+  // retaining an old file or QR stream.
+  cfgFile.addEventListener("click", () => clearFileSelection());
+  cfgSourceDirectory.addEventListener("click", () => clearFileSelection(true));
   cfgFile.addEventListener("change", () => void selectFile());
   cfgSourceDirectory.addEventListener("change", () => void selectSourceDirectory());
   sendSnippetBtn.addEventListener("click", () => void selectSnippet());
