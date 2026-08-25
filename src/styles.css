@@ -2952,3 +2952,43 @@ img.received {
   cursor: not-allowed;
   opacity: 0.5;
 }
+
+.dialog-style-03.send-transfer-dialog,
+.dialog-style-03.receive-capture-dialog {
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  max-height: none;
+  transform: none;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+}
+
+.dialog-style-03.send-transfer-dialog {
+  background: #f4f4f5;
+}
+
+.dialog-style-03.receive-capture-dialog {
+  color: #fff;
+  background: #09090b;
+}
+
+.send-transfer-dialog #qr-display-area {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+@media (min-width: 640px) {
+  .dialog-style-03.send-transfer-dialog,
+  .dialog-style-03.receive-capture-dialog {
+    gap: 0.75rem;
+    padding: 1.25rem;
+  }
+}

@@ -384,7 +384,7 @@ function SendTransferDialog() {
       {hasTransfer ? <DialogTrigger asChild><Button type="button" variant="outline">查看二维码发送</Button></DialogTrigger> : null}
       <DialogContent
         persistent
-        className="app-style-42"
+        className="send-transfer-dialog"
       >
         <DialogHeader className="app-style-43">
           <DialogTitle className="app-style-44">二维码发送</DialogTitle>
@@ -555,7 +555,7 @@ function ReceiveView() {
         <Dialog open={captureOpen} onOpenChange={changeCaptureOpen}>
           <DialogContent
             persistent
-            className="app-style-76"
+            className="receive-capture-dialog"
           >
             <DialogHeader className="app-style-77">
               <DialogTitle className="app-style-78">实时扫描</DialogTitle>
