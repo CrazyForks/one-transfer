@@ -49,6 +49,7 @@ import {
 import { createSourceArchiveInWorker } from "../shared/source-archive-client";
 import {
   SOURCE_ARCHIVE_PROGRESS_EVENT,
+  SOURCE_ARCHIVE_CLEAR_EVENT,
   SOURCE_ARCHIVE_OPTIONS_EVENT,
   SOURCE_ARCHIVE_SEND_EVENT,
   type SourceArchiveOptionsDetail,
@@ -159,6 +160,8 @@ function reportSourceArchive(detail: SourceArchiveProgressDetail): void {
 const onSourceArchiveOptions = (event: Event) => {
   sourceArchiveOptions = (event as CustomEvent<SourceArchiveOptionsDetail>).detail;
 };
+
+const onSourceArchiveClear = () => clearFileSelection(true);
 
 function reportSendProgress(detail: SendProgressDetail) {
   window.dispatchEvent(new CustomEvent<SendProgressDetail>(SEND_PROGRESS_EVENT, { detail }));
@@ -360,6 +363,7 @@ async function main() {
   window.addEventListener("resize", onResize);
   window.addEventListener(SEND_SPEED_CHANGE_EVENT, onSpeedChange);
   window.addEventListener(SOURCE_ARCHIVE_OPTIONS_EVENT, onSourceArchiveOptions);
+  window.addEventListener(SOURCE_ARCHIVE_CLEAR_EVENT, onSourceArchiveClear);
   window.addEventListener(SOURCE_ARCHIVE_SEND_EVENT, onSourceArchiveSend);
 }
 
@@ -631,6 +635,7 @@ return () => {
   window.removeEventListener("resize", onResize);
   window.removeEventListener(SEND_SPEED_CHANGE_EVENT, onSpeedChange);
   window.removeEventListener(SOURCE_ARCHIVE_OPTIONS_EVENT, onSourceArchiveOptions);
+  window.removeEventListener(SOURCE_ARCHIVE_CLEAR_EVENT, onSourceArchiveClear);
   window.removeEventListener(SOURCE_ARCHIVE_SEND_EVENT, onSourceArchiveSend);
   qrResizeObserver?.disconnect();
   revokeSourceArchiveDownload();

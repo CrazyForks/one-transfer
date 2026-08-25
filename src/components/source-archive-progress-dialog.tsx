@@ -18,6 +18,7 @@ import { formatBytes } from "../../shared/format";
 import {
   SOURCE_ARCHIVE_OPTIONS_EVENT,
   SOURCE_ARCHIVE_PROGRESS_EVENT,
+  SOURCE_ARCHIVE_CLEAR_EVENT,
   SOURCE_ARCHIVE_COPY_EVENT,
   SOURCE_ARCHIVE_SEND_EVENT,
   type SourceArchiveOptionsDetail,
@@ -77,6 +78,10 @@ export function SourceArchiveProgressDialog({
     (document.getElementById(directoryInputId) as HTMLInputElement | null)?.click();
   };
 
+  const clearPreviousSelection = () => {
+    window.dispatchEvent(new Event(SOURCE_ARCHIVE_CLEAR_EVENT));
+  };
+
   const sendByQr = () => {
     window.dispatchEvent(new Event(SOURCE_ARCHIVE_SEND_EVENT));
   };
@@ -93,7 +98,7 @@ export function SourceArchiveProgressDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button type="button" variant="outline"><FolderArchive />选择工程文件夹</Button>
+        <Button type="button" variant="outline" onClick={clearPreviousSelection}><FolderArchive />选择工程文件夹</Button>
       </DialogTrigger>
       <DialogContent className="source-archive-progress-dialog-style-01">
         <DialogHeader>

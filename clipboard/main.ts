@@ -12,6 +12,7 @@ import { statusLine } from "../shared/status-line";
 import { createSourceArchiveInWorker } from "../shared/source-archive-client";
 import {
   SOURCE_ARCHIVE_COPY_EVENT,
+  SOURCE_ARCHIVE_CLEAR_EVENT,
   SOURCE_ARCHIVE_OPTIONS_EVENT,
   SOURCE_ARCHIVE_PROGRESS_EVENT,
   type SourceArchiveOptionsDetail,
@@ -105,6 +106,8 @@ const onSourceArchiveOptions = (event: Event) => {
 const onSourceArchiveCopy = () => {
   void copyTransfer(false);
 };
+
+const onSourceArchiveClear = () => clearClipboardSelection(true);
 
 function showToast(message: string, tone: "success" | "error"): void {
   clearTimeout(toastTimer);
@@ -447,6 +450,7 @@ projectDirectoryInput.addEventListener("change", () => void prepareProjectDirect
 copyButton.addEventListener("click", () => void copyTransfer());
 window.addEventListener(SOURCE_ARCHIVE_OPTIONS_EVENT, onSourceArchiveOptions);
 window.addEventListener(SOURCE_ARCHIVE_COPY_EVENT, onSourceArchiveCopy);
+window.addEventListener(SOURCE_ARCHIVE_CLEAR_EVENT, onSourceArchiveClear);
 return () => {
   processingAbortController?.abort();
   processingAbortController = null;
@@ -457,6 +461,7 @@ return () => {
   selected = null;
   window.removeEventListener(SOURCE_ARCHIVE_OPTIONS_EVENT, onSourceArchiveOptions);
   window.removeEventListener(SOURCE_ARCHIVE_COPY_EVENT, onSourceArchiveCopy);
+  window.removeEventListener(SOURCE_ARCHIVE_CLEAR_EVENT, onSourceArchiveClear);
   revokeSourceArchiveDownload();
   reportSourceArchive({ state: "idle", percent: 0, message: "" });
 };
