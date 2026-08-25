@@ -81,13 +81,14 @@ ctx.onmessage = async (e: MessageEvent) => {
       { id, bytes, payloads, decodeMs: performance.now() - startedAt, mode },
       payloads.map((payload) => payload.buffer as ArrayBuffer),
     );
-  } catch {
+  } catch (error) {
     ctx.postMessage({
       id,
       bytes: null,
       payloads: [],
       decodeMs: performance.now() - startedAt,
       mode,
+      error: error instanceof Error ? error.message : String(error),
     });
   }
 };

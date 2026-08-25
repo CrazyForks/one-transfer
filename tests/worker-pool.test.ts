@@ -122,6 +122,8 @@ test("a worker batch hands every decoded symbol to the consumer", () => {
     totalDecodeMs: 12.5,
     averageDecodeMs: 12.5,
     robustAttempts: 0,
+    decodeErrors: 0,
+    lastError: undefined,
   });
 });
 
@@ -152,6 +154,8 @@ test("pool metrics include busy drops and robust decode reports", () => {
     totalDecodeMs: 20,
     averageDecodeMs: 20,
     robustAttempts: 1,
+    decodeErrors: 0,
+    lastError: undefined,
   });
 
   pool.resetMetrics();
@@ -163,6 +167,8 @@ test("pool metrics include busy drops and robust decode reports", () => {
     totalDecodeMs: 0,
     averageDecodeMs: 0,
     robustAttempts: 0,
+    decodeErrors: 0,
+    lastError: undefined,
   });
 });
 

@@ -485,10 +485,10 @@ Each QR frame contains a 20-byte little-endian header followed by one encoded bl
 | 16 | `u32` | Payload FNV-1a | Fast recovered-container check |
 | 20 | variable | Encoded block | Fountain XOR output |
 
-The high-throughput layout keeps four independently decodable QR symbols visible, but replaces only one
-cell on each visual tick. The Balanced preset emits 60 symbols per second at 1465 bytes per symbol; the
-20-byte header leaves a 1445-byte encoded block. QR error-correction level L is used. A single
-speed slider combines the frame-size and tick-rate choices into Stable, Balanced, and Fast presets;
+The high-throughput layout replaces four independently decodable QR symbols on each visual tick. The
+Balanced preset emits `4 × 30 = 120` symbols per second at 1700 bytes per symbol; the 20-byte header
+leaves a 1680-byte encoded block. QR error-correction level L is used. Three speed buttons combine the
+frame-size and tick-rate choices into Stable, Balanced, and Fast presets;
 difficult displays or cameras should move it toward the minimum.
 
 On the send page, One Transfer first inspects the capabilities the browser may expose: logical CPU
@@ -497,12 +497,12 @@ then applies the highest preset whose complete requirements are met:
 
 | Preset | Local recommendation boundary | Raw model |
 |---|---|---:|
-| Stable | Constrained CPU, refresh rate, or physical pixels | about 20 KiB/s |
-| Balanced | 4+ logical CPUs, about 45+ Hz, 1200px+ physical short edge | about 85 KiB/s |
-| Fast | 8+ logical CPUs, about 55+ Hz, 1800px+ physical short edge | about 135 KiB/s |
+| Stable | Constrained CPU, refresh rate, or physical pixels | about 135 KiB/s |
+| Balanced | 4+ logical CPUs, about 45+ Hz, 1200px+ physical short edge | about 197 KiB/s |
+| Fast | 8+ logical CPUs, about 55+ Hz, 1800px+ physical short edge | about 271 KiB/s |
 
 Missing privacy-restricted values, such as `deviceMemory` in some browsers, do not automatically lower
-the recommendation. The result and its evidence are shown under the slider. This inspection covers the
+the recommendation. The result and its evidence are shown under the preset buttons. This inspection covers the
 sending computer only; receiver camera quality, remote-desktop compression, and receiver CPU remain
 unknown, so the user can always lower the preset manually.
 
@@ -604,8 +604,7 @@ so the practical limit remains lower than the browser's theoretical memory ceili
 
 ### 8.2 Optical Channel
 
-The sender keeps four QR symbols visible but replaces only one on each visual tick. Every cell remains
-stable for four update periods, so a rolling-shutter transition cannot corrupt the whole grid at once:
+The sender replaces all four QR symbols on each visual tick:
 
 ```text
 symbolsPerSecond = symbolsPerTick × ticksPerSecond
@@ -613,14 +612,15 @@ rawKiB/s = symbolsPerSecond × (frameBytes - headerBytes) / 1024
 netKiB/s ≈ rawKiB/s × decodeSuccessRate / fountainOverhead
 ```
 
-The Balanced values are `1 × 60 = 60` symbols/s and `blockLength = 1465 - 20 = 1445` bytes, for a
-raw payload ceiling of `84.66796875 KiB/s`. This is a model, not a benchmark. For example:
+The Balanced values are `4 × 30 = 120` symbols/s and `blockLength = 1700 - 20 = 1680` bytes, for a
+raw payload ceiling of `196.875 KiB/s`. This is a model, not a benchmark. The copyable receiver log
+records capture, worker, recognition, duplicate-frame, fountain-decoder, and goodput metrics. For example:
 
 | Decoded unique symbols | Fountain overhead | Estimated net goodput |
 |---:|---:|---:|
-| 100% | 1.15× | 73.6 KiB/s |
-| 75% | 1.20× | 52.9 KiB/s |
-| 50% | 1.30× | 32.6 KiB/s |
+| 100% | 1.15× | 171.2 KiB/s |
+| 75% | 1.20× | 123.0 KiB/s |
+| 50% | 1.30× | 75.7 KiB/s |
 
 Real throughput depends on display refresh, tearing, exposure, autofocus, distance, ambient light,
 moiré patterns, video compression, decoder speed, and fountain redundancy. The fast ZXing path avoids

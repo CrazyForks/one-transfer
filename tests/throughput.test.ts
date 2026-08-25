@@ -7,15 +7,15 @@ import {
   estimateRawKiBPerSecond,
 } from "../shared/throughput.ts";
 
-test("the default staggered four-QR layout produces 60 symbols per second", () => {
+test("the default four-QR layout produces 120 symbols per second", () => {
   const estimate = estimateOpticalThroughput(DEFAULT_OPTICAL_THROUGHPUT_CONFIG, {
     decodeSuccessRate: 1,
     fountainOverhead: 1,
   });
 
-  assert.equal(estimate.symbolsPerSecond, 60);
-  assert.equal(estimate.blockBytes, 1445);
-  assert.equal(estimate.rawKiBPerSecond, 84.66796875);
+  assert.equal(estimate.symbolsPerSecond, 120);
+  assert.equal(estimate.blockBytes, 1680);
+  assert.equal(estimate.rawKiBPerSecond, 196.875);
   assert.equal(estimate.netKiBPerSecond, estimate.rawKiBPerSecond);
 });
 
@@ -37,7 +37,7 @@ test("net throughput accounts for decode loss and fountain redundancy", () => {
     fountainOverhead: 1.2,
   });
 
-  assert.equal(net, 52.91748046875);
+  assert.equal(net, 123.046875);
 });
 
 test("invalid physical and link parameters are rejected", () => {

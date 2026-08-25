@@ -55,7 +55,34 @@ const cfgWidth = document.getElementById("cfg-width") as HTMLSelectElement;
 const cfgCapFps = document.getElementById("cfg-capfps") as HTMLSelectElement;
 const cfgWorkers = document.getElementById("cfg-workers") as HTMLSelectElement;
 const captureActual = document.getElementById("capture-actual")!;
+const receiveLog = document.getElementById("receive-log")!;
+const copyReceiveLog = document.getElementById("copy-receive-log") as HTMLButtonElement;
+const clearReceiveLog = document.getElementById("clear-receive-log") as HTMLButtonElement;
 const metric = (id: string) => document.getElementById(id)!;
+
+const diagnosticLines: string[] = [];
+function diagnosticLog(event: string, detail: Record<string, unknown> = {}) {
+  const line = `${new Date().toISOString()} ${event} ${JSON.stringify(detail)}`;
+  diagnosticLines.push(line);
+  if (diagnosticLines.length > 200) diagnosticLines.splice(0, diagnosticLines.length - 200);
+  receiveLog.textContent = diagnosticLines.join("\n");
+  receiveLog.scrollTop = receiveLog.scrollHeight;
+  console.debug("[One Transfer receive]", event, detail);
+}
+
+copyReceiveLog.onclick = async () => {
+  try {
+    await navigator.clipboard.writeText(diagnosticLines.join("\n"));
+    copyReceiveLog.textContent = "已复制";
+    window.setTimeout(() => { copyReceiveLog.textContent = "复制"; }, 1200);
+  } catch {
+    copyReceiveLog.textContent = "复制失败";
+  }
+};
+clearReceiveLog.onclick = () => {
+  diagnosticLines.length = 0;
+  receiveLog.textContent = "日志已清空";
+};
 
 // Nothing has decoded in this long → the sender is almost certainly too dense
 // for this capture. Also the delay before a dismissed hint comes back, since
@@ -80,6 +107,9 @@ let resultObjectUrl: string | null = null;
 let disposed = false;
 let lastAutoScaleDropCount = 0;
 let workersManuallySet = false;
+let parsedPayloadCount = 0;
+let invalidPayloadCount = 0;
+let lastDiagnosticAt = 0;
 const finishedStreamKeys = new Set<string>();
 const intentionallyStoppedTracks = new WeakSet<MediaStreamTrack>();
 
@@ -88,6 +118,13 @@ const pool = new DecodeWorkerPool(createDecodeWorker, (bytes) => onDecoded(bytes
 const captureTimes: number[] = [];
 const decodeTimes: number[] = [];
 let busyDropCount = 0;
+
+diagnosticLog("receiver-mounted", {
+  userAgent: navigator.userAgent,
+  logicalCores: navigator.hardwareConcurrency,
+  viewport: `${window.innerWidth}x${window.innerHeight}`,
+  devicePixelRatio: window.devicePixelRatio,
+});
 
 const onCaptureStart = (event: Event) => {
   void start((event as CustomEvent<ReceiveCaptureSource>).detail);
@@ -187,6 +224,12 @@ async function start(source: "screen" | "camera") {
   }
   const captureWidth = Number(cfgWidth.value);
   const captureFps = Number(cfgCapFps.value);
+  diagnosticLog("capture-request", {
+    source,
+    requestedWidth: captureWidth,
+    requestedFps: captureFps,
+    requestedWorkers: Number(cfgWorkers.value),
+  });
   captureSource = source;
   // Nothing on the page changes until the selected capture is actually live:
   // error paths below all have to leave a usable Start button behind.
@@ -219,6 +262,11 @@ async function start(source: "screen" | "camera") {
       }
     }
   } catch (err) {
+    diagnosticLog("capture-error", {
+      source,
+      name: err instanceof DOMException ? err.name : undefined,
+      message: err instanceof Error ? err.message : String(err),
+    });
     const denied = err instanceof DOMException && err.name === "NotAllowedError";
     offerRetry(
       denied
@@ -248,6 +296,13 @@ async function start(source: "screen" | "camera") {
   await video.play().catch(() => undefined);
   const track = stream.getVideoTracks()[0];
   const settings = track?.getSettings();
+  diagnosticLog("capture-started", {
+    source,
+    width: settings?.width,
+    height: settings?.height,
+    frameRate: settings?.frameRate,
+    facingMode: settings?.facingMode,
+  });
   updatePreviewAspect(settings);
   track?.addEventListener("ended", () => {
     if (track && intentionallyStoppedTracks.delete(track)) return;
@@ -267,10 +322,14 @@ async function start(source: "screen" | "camera") {
   workersManuallySet = false;
   captureTimes.length = 0;
   decodeTimes.length = 0;
+  parsedPayloadCount = 0;
+  invalidPayloadCount = 0;
+  lastDiagnosticAt = 0;
   const logicalCores = navigator.hardwareConcurrency || 4;
   const suggestedWorkers = logicalCores >= 8 ? 4 : logicalCores >= 6 ? 3 : 2;
   cfgWorkers.value = String(suggestedWorkers);
   pool.resize(Number(cfgWorkers.value));
+  diagnosticLog("worker-pool-ready", { workers: pool.size });
   reportCaptureSettings();
   if (!settingsWired) {
     settingsWired = true;
@@ -307,6 +366,11 @@ function reportCaptureSettings() {
 
 async function applyReceiveSettings() {
   pool.resize(Number(cfgWorkers.value));
+  diagnosticLog("settings-change", {
+    decodeWidth: Number(cfgWidth.value),
+    requestedFps: Number(cfgCapFps.value),
+    workers: pool.size,
+  });
   const track = stream?.getVideoTracks()[0];
   if (!track) return;
   const width = Number(cfgWidth.value);
@@ -321,6 +385,11 @@ async function applyReceiveSettings() {
           },
     );
   } catch {
+    diagnosticLog("settings-apply-failed", {
+      source: captureSource,
+      decodeWidth: width,
+      requestedFps: Number(cfgCapFps.value),
+    });
     captureActual.textContent =
       `${captureSource === "screen" ? "屏幕" : "相机"}无法应用帧率设置`;
     return;
@@ -391,7 +460,12 @@ function captureFrame() {
 function onDecoded(bytes: Uint8Array) {
   decodeTimes.push(performance.now());
   const parsed = parseFrame(bytes);
-  if (!parsed || finishing) return;
+  if (!parsed) {
+    invalidPayloadCount++;
+    return;
+  }
+  parsedPayloadCount++;
+  if (finishing) return;
   const { header, block } = parsed;
   if (noSignal.frameDecoded()) replaceResult();
   // streamIdentity() covers every header field that has to hold constant, not
@@ -411,6 +485,12 @@ function onDecoded(bytes: Uint8Array) {
     progressEl.style.display = "block";
     progressStatus.style.display = "flex";
     showLoading("正在接收新内容…");
+    diagnosticLog("stream-detected", {
+      sessionId: header.sessionId,
+      sourceBlocks: header.k,
+      blockBytes: header.blockLen,
+      totalBytes: header.totalLen,
+    });
   }
   decoder.addFrame(header.seq, block);
   updateProgressEstimate();
@@ -470,6 +550,12 @@ async function finish(
   seconds: number,
   maxFileBytes: number,
 ) {
+  diagnosticLog("transfer-finish", {
+    seconds: Number(seconds.toFixed(2)),
+    containerBytes: container.length,
+    hashOk,
+    netKiBps: Number((container.length / 1024 / Math.max(0.1, seconds)).toFixed(2)),
+  });
   bar.style.width = "100%";
   progressEl.setAttribute("aria-valuenow", "100");
   etaLabel.textContent = `共 ${formatDuration(seconds)}`;
@@ -557,6 +643,12 @@ async function finish(
  * that parses, which is the only thing that actually means it worked.
  */
 function showNoSignalHint() {
+  diagnosticLog("no-signal", {
+    source: captureSource,
+    elapsedMs: NO_SIGNAL_AFTER_MS,
+    decodedPayloads: pool.metrics.decodedPayloads,
+    busyDrops: busyDropCount + pool.metrics.dropped,
+  });
   const panel = document.createElement("div");
   panel.className = "no-signal";
   // It appears on a timer rather than in response to anything the user did,
@@ -621,8 +713,10 @@ function updateStats() {
   prune(captureTimes);
   prune(decodeTimes);
   const perSecond = (a: number[]) => a.length / (STATS_WINDOW_MS / 1000);
-  metric("m-cap").textContent = perSecond(captureTimes).toFixed(0);
-  metric("m-dec").textContent = perSecond(decodeTimes).toFixed(1);
+  const captureFps = perSecond(captureTimes);
+  const decodedPayloadFps = perSecond(decodeTimes);
+  metric("m-cap").textContent = captureFps.toFixed(0);
+  metric("m-dec").textContent = decodedPayloadFps.toFixed(1);
   const decode = pool.metrics;
   const newBusyDrops = busyDropCount - lastAutoScaleDropCount;
   if (!workersManuallySet && newBusyDrops >= 5 && pool.size < 4) {
@@ -635,9 +729,33 @@ function updateStats() {
   metricsEl.dataset.workerBusyDrops = String(busyDropCount + decode.dropped);
   metricsEl.dataset.workerCompleted = String(decode.completed);
   metricsEl.dataset.robustAttempts = String(decode.robustAttempts);
+  metricsEl.dataset.decodeErrors = String(decode.decodeErrors);
   reportCaptureSettings();
   if (noSignal.tick(now)) showNoSignalHint();
-  if (!decoder) return;
+  if (!decoder) {
+    if (now - lastDiagnosticAt >= STATS_WINDOW_MS) {
+      lastDiagnosticAt = now;
+      const trackSettings = stream?.getVideoTracks()[0]?.getSettings();
+      diagnosticLog("search-snapshot", {
+        source: captureSource,
+        camera: `${trackSettings?.width ?? 0}x${trackSettings?.height ?? 0}@${trackSettings?.frameRate ?? 0}`,
+        decodeCanvas: `${grab.width}x${grab.height}`,
+        captureFps: Number(captureFps.toFixed(1)),
+        decodedPayloadFps: Number(decodedPayloadFps.toFixed(1)),
+        submitted: decode.submitted,
+        completed: decode.completed,
+        detectedPayloads: decode.decodedPayloads,
+        parsedPayloads: parsedPayloadCount,
+        invalidPayloads: invalidPayloadCount,
+        averageDecodeMs: Number(decode.averageDecodeMs.toFixed(1)),
+        busyDrops: busyDropCount + decode.dropped,
+        robustAttempts: decode.robustAttempts,
+        decodeErrors: decode.decodeErrors,
+        lastDecodeError: decode.lastError,
+      });
+    }
+    return;
+  }
   const elapsed = (now - startTs) / 1000;
   updateProgressEstimate();
   metric("m-rate").textContent = `${goodputKbs(elapsed).toFixed(1)} KB/s`;
@@ -646,10 +764,40 @@ function updateStats() {
   metric("m-k").textContent = String(decoder.k);
   metric("m-block").textContent = `${decoder.blockLen} B`;
   metric("m-payload").textContent = `${Math.round(decoder.totalLen / 1024)} KB`;
+
+  if (now - lastDiagnosticAt >= STATS_WINDOW_MS) {
+    lastDiagnosticAt = now;
+    const trackSettings = stream?.getVideoTracks()[0]?.getSettings();
+    diagnosticLog("throughput-snapshot", {
+      source: captureSource,
+      camera: `${trackSettings?.width ?? 0}x${trackSettings?.height ?? 0}@${trackSettings?.frameRate ?? 0}`,
+      decodeCanvas: `${grab.width}x${grab.height}`,
+      captureFps: Number(captureFps.toFixed(1)),
+      decodedPayloadFps: Number(decodedPayloadFps.toFixed(1)),
+      submitted: decode.submitted,
+      completed: decode.completed,
+      detectedPayloads: decode.decodedPayloads,
+      parsedPayloads: parsedPayloadCount,
+      invalidPayloads: invalidPayloadCount,
+      newFrames: decoder.framesNew,
+      duplicateFrames: decoder.framesDup,
+      solvedBlocks: decoder.solvedCount,
+      sourceBlocks: decoder.k,
+      averageDecodeMs: Number(decode.averageDecodeMs.toFixed(1)),
+      busyDrops: busyDropCount + decode.dropped,
+      robustAttempts: decode.robustAttempts,
+      decodeErrors: decode.decodeErrors,
+      lastDecodeError: decode.lastError,
+      netKiBps: Number(goodputKbs(elapsed).toFixed(2)),
+    });
+  }
 }
 
 return () => {
+  diagnosticLog("receiver-unmount");
   disposed = true;
+  copyReceiveLog.onclick = null;
+  clearReceiveLog.onclick = null;
   window.removeEventListener(RECEIVE_CAPTURE_START_EVENT, onCaptureStart);
   window.removeEventListener(RECEIVE_CAPTURE_CLOSE_EVENT, onCaptureDialogClose);
   stopCaptureForNavigation();

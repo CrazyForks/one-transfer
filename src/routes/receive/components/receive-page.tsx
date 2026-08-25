@@ -85,6 +85,16 @@ export function ReceivePage() {
                 <span>新帧/重复 <strong id="m-frames">—</strong></span><span>数据块 K <strong id="m-k">—</strong></span><span>块大小 <strong id="m-block">—</strong></span><span>负载 <strong id="m-payload">—</strong></span>
               </div>
               <span id="capture-actual" className="receive-capture-actual" />
+              <div className="receive-log-panel">
+                <div className="receive-log-toolbar">
+                  <strong>定位日志</strong>
+                  <span>
+                    <button id="copy-receive-log" type="button">复制</button>
+                    <button id="clear-receive-log" type="button">清空</button>
+                  </span>
+                </div>
+                <pre id="receive-log">等待扫描…</pre>
+              </div>
             </section>
             <div className="app-style-81">
               <div className="app-style-82" id="preview" style={{ display: "none" }}>

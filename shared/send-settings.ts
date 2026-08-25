@@ -4,18 +4,17 @@
 // the sender doesn't offer.
 
 /** What the no-signal hint tells the user to turn the sender down to. */
-export const NO_SIGNAL_HINT_FRAME_BYTES = 700;
-export const NO_SIGNAL_HINT_TX_FPS = 30;
+export const NO_SIGNAL_HINT_FRAME_BYTES = 1465;
+export const NO_SIGNAL_HINT_TX_FPS = 24;
 
-/** Four symbols stay visible, but only one changes on each display tick. */
+/** Four independently decodable symbols are replaced on every display tick. */
 export const QR_GRID_CELLS = 4;
-export const QR_SYMBOLS_PER_TICK = 1;
+export const QR_SYMBOLS_PER_TICK = QR_GRID_CELLS;
 
-// One cell changes per refresh, so every QR remains stable for four display
-// cycles. The widened integer-pixel grid keeps V27 camera-readable while
-// 60 updates/s restores the useful throughput of the earlier stream.
-export const DEFAULT_TX_FPS = 60;
-export const DEFAULT_FRAME_BYTES = 1465;
+// Four moderate-density symbols at 30 display ticks/s previously sustained
+// materially higher camera goodput than one staggered symbol at 60 ticks/s.
+export const DEFAULT_TX_FPS = 30;
+export const DEFAULT_FRAME_BYTES = 1700;
 
 export interface SendSpeedProfile {
   label: string;
@@ -30,7 +29,7 @@ export const SEND_SPEED_PROFILES: readonly SendSpeedProfile[] = [
   { label: "高速", txFps: DEFAULT_TX_FPS, frameBytes: 2331 },
 ];
 
-export const DEFAULT_SPEED_PROFILE_INDEX = 0;
+export const DEFAULT_SPEED_PROFILE_INDEX = 1;
 export const SEND_SPEED_CHANGE_EVENT = "one-transfer:speed-change";
 export const SEND_SPEED_SYNC_EVENT = "one-transfer:speed-sync";
 
@@ -41,12 +40,12 @@ export const TX_FPS_OPTIONS: readonly number[] = [
   20,
   NO_SIGNAL_HINT_TX_FPS,
   DEFAULT_TX_FPS,
-  60,
 ];
 export const FRAME_BYTES_OPTIONS: readonly number[] = [
   500,
-  NO_SIGNAL_HINT_FRAME_BYTES,
   1000,
+  NO_SIGNAL_HINT_FRAME_BYTES,
   DEFAULT_FRAME_BYTES,
+  1850,
   2331,
 ];

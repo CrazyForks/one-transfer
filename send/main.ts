@@ -521,8 +521,8 @@ async function startStream(revealStage = false) {
       // scroll target would be the wrong height.
       if (revealStage) scrollStageIntoView();
       setStatus(
-        `${speedProfile.label} · ${QR_GRID_CELLS} QR 轮流刷新 · ` +
-          `${txFps * QR_SYMBOLS_PER_TICK} symbols/s · 每码约 ${txFps / QR_GRID_CELLS} 次/s · ` +
+        `${speedProfile.label} · ${QR_GRID_CELLS} QR 同步刷新 · ` +
+          `${txFps * QR_SYMBOLS_PER_TICK} symbols/s · 每码 ${txFps} 次/s · ` +
           `${frameBytes} 字节 · V${version} · ${scale} px/模块 · ECC ${ecc} · ` +
           `${name} · ${formatBytes(fileSize)} · ` +
           `${compression === "gzip" ? `gzip 后 ${formatBytes(transmittedSize)}` : "未压缩"} · ` +
@@ -573,12 +573,11 @@ async function startStream(revealStage = false) {
   let nextAt = performance.now();
   let animationFrameId = 0;
   let pumpTimer: number | null = null;
-  let nextCanvasIndex = 0;
   const schedulePump = () => {
     if (pumpTimer !== null || generatorFailed || gen !== generation) return;
     pumpTimer = window.setTimeout(() => {
       pumpTimer = null;
-      pump(1);
+      pump(QR_SYMBOLS_PER_TICK);
     }, 0);
   };
   const tick = (now: number) => {
@@ -587,14 +586,13 @@ async function startStream(revealStage = false) {
     if (gen !== generation || generatorFailed) return;
     animationFrameId = requestAnimationFrame(tick);
     if (now + 0.5 < nextAt) return;
-    const frame = queue.shift();
-    if (!frame) {
+    if (queue.length < QR_SYMBOLS_PER_TICK) {
       schedulePump();
       nextAt = now + interval;
       return;
     }
-    drawSymbol(nextCanvasIndex, frame);
-    nextCanvasIndex = (nextCanvasIndex + 1) % QR_GRID_CELLS;
+    const batch = queue.splice(0, QR_SYMBOLS_PER_TICK);
+    batch.forEach((frame, index) => drawSymbol(index, frame));
     emittedSymbols += QR_SYMBOLS_PER_TICK;
     const round = Math.floor((emittedSymbols - 1) / targetSymbols) + 1;
     const emittedInRound = ((emittedSymbols - 1) % targetSymbols) + 1;

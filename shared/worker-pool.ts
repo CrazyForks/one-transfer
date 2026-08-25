@@ -22,6 +22,7 @@ interface DecodeMessage {
   payloads?: Uint8Array[];
   decodeMs?: number;
   mode?: "fast" | "robust";
+  error?: string;
 }
 
 export interface DecodeWorkerReport {
@@ -38,6 +39,8 @@ export interface DecodeWorkerPoolMetrics {
   totalDecodeMs: number;
   averageDecodeMs: number;
   robustAttempts: number;
+  decodeErrors: number;
+  lastError?: string;
 }
 
 export class DecodeWorkerPool {
@@ -49,6 +52,8 @@ export class DecodeWorkerPool {
   private decodedPayloads = 0;
   private totalDecodeMs = 0;
   private robustAttempts = 0;
+  private decodeErrors = 0;
+  private lastError: string | undefined;
 
   constructor(
     private readonly create: () => PoolWorker,
@@ -73,6 +78,8 @@ export class DecodeWorkerPool {
       totalDecodeMs: this.totalDecodeMs,
       averageDecodeMs: this.completed > 0 ? this.totalDecodeMs / this.completed : 0,
       robustAttempts: this.robustAttempts,
+      decodeErrors: this.decodeErrors,
+      lastError: this.lastError,
     };
   }
 
@@ -83,6 +90,8 @@ export class DecodeWorkerPool {
     this.decodedPayloads = 0;
     this.totalDecodeMs = 0;
     this.robustAttempts = 0;
+    this.decodeErrors = 0;
+    this.lastError = undefined;
   }
 
   /** Grow or shrink in place. Terminating a busy worker just drops the frame it
@@ -96,7 +105,7 @@ export class DecodeWorkerPool {
       const slot = this.workers.length;
       const worker = this.create();
       worker.onmessage = (event: MessageEvent) => {
-        const { id, bytes, payloads, decodeMs, mode } = event.data as DecodeMessage;
+        const { id, bytes, payloads, decodeMs, mode, error } = event.data as DecodeMessage;
         if (id === -1) return; // warm-up ping, no frame attached
         this.busy[slot] = false;
         const decoded = payloads ?? (bytes ? [bytes] : []);
@@ -109,6 +118,10 @@ export class DecodeWorkerPool {
         this.decodedPayloads += decoded.length;
         this.totalDecodeMs += elapsed;
         if (usedMode === "robust") this.robustAttempts++;
+        if (error) {
+          this.decodeErrors++;
+          this.lastError = error;
+        }
         const report: DecodeWorkerReport = {
           decodeMs: elapsed,
           payloadCount: decoded.length,
