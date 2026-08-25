@@ -8,8 +8,6 @@
   <img src="https://img.shields.io/badge/React-19-20232A?logo=react&logoColor=61DAFB" alt="React 19" />
   <img src="https://img.shields.io/badge/Vite-6-646CFF?logo=vite&logoColor=white" alt="Vite 6" />
   <img src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white" alt="TypeScript 5" />
-  <img src="https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwind-css&logoColor=white" alt="Tailwind CSS 4" />
-  <img src="https://img.shields.io/badge/shadcn%2Fui-black?logo=shadcnui&logoColor=white" alt="shadcn/ui" />
   <img src="https://img.shields.io/badge/GSAP-3-0AE448?logo=greensock&logoColor=black" alt="GSAP 3" />
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License" />
 </p>
@@ -24,7 +22,7 @@
 - **完整性校验：** 文件容器、长度、FNV-1a、gzip 上限和 SHA-256 分层校验。
 - **浏览器本地处理：** 文件不上传到应用服务器。
 - **离线使用：** PWA 缓存 SPA、Worker、WASM 和 Windows 还原脚本。
-- **现代界面：** React Router、Tailwind CSS、shadcn/ui 与 reduced-motion 友好的 GSAP 动效。
+- **现代界面：** React Router、原生静态 CSS、本地组件与 reduced-motion 友好的 GSAP 动效。
 
 ## 🚀 快速开始
 
@@ -242,7 +240,7 @@ flowchart LR
 
 - React 19、Vite 6 与 TypeScript 5
 - React Router 7 持久化 `BrowserRouter` Layout
-- Tailwind CSS 4 与本地 shadcn/ui 组件
+- 原生静态 CSS 与本地组件
 - GSAP 3 加载、路由、Tabs 与页面呼吸动效
 - `qrcode` 生成二维码
 - `zxing-wasm` 在 Web Worker 中解码二维码
@@ -472,7 +470,7 @@ LT（Luby Transform）喷泉码解决该问题：
 
 默认高吞吐布局持续显示 4 个可独立解码的二维码，但每次画面更新只替换其中 1 个，四格
 轮流刷新。平衡档每秒产生 60 个 symbol、每码 1465 字节；扣除 20 字节帧头后，每码携带
-1445 字节编码块。QR 纠错级别为 L。页面只提供一个 shadcn/ui 速度滑块，将二维码密度和更新率
+1445 字节编码块。QR 纠错级别为 L。页面只提供一个速度滑块，将二维码密度和更新率
 组合成“稳定、平衡、高速”三个档位；复杂屏幕、远距离或低质量相机应向最低档调整。
 
 进入发送页后，One Transfer 会先检查浏览器允许读取的本机能力：逻辑 CPU 数、近似内存、
@@ -640,10 +638,10 @@ one-transfer/
 ├── src/
 │   ├── main.tsx               # React 根节点与 BrowserRouter
 │   ├── app.tsx                # 持久路由、页面、loading 与 GSAP
-│   ├── styles.css             # Tailwind 入口与动态控制器样式
-│   ├── components/            # 构建信息、更新检查与本地 shadcn/ui
+│   ├── styles.css             # Chrome 109 兼容的静态 CSS 与控制器样式
+│   ├── components/            # 构建信息、更新检查与本地组件
 │   ├── lib/device-capabilities.ts # 浏览器设备能力检测
-│   └── lib/utils.ts           # shadcn/ui class 合并工具
+│   └── lib/utils.ts           # class 合并工具
 ├── send/main.ts               # 文件/文字封装、LT 编码与 QR 播放
 ├── receive/
 │   ├── main.ts                # 媒体捕获、进度、恢复和结果展示

@@ -18,6 +18,7 @@ import { formatBytes } from "../../shared/format";
 import {
   SOURCE_ARCHIVE_OPTIONS_EVENT,
   SOURCE_ARCHIVE_PROGRESS_EVENT,
+  SOURCE_ARCHIVE_COPY_EVENT,
   SOURCE_ARCHIVE_SEND_EVENT,
   type SourceArchiveOptionsDetail,
   type SourceArchiveProgressDetail,
@@ -29,7 +30,13 @@ const initialDetail: SourceArchiveProgressDetail = {
   message: "配置完成后选择工程文件夹",
 };
 
-export function SourceArchiveProgressDialog({ directoryInputId }: { directoryInputId: string }) {
+export function SourceArchiveProgressDialog({
+  directoryInputId,
+  completionAction = "qr",
+}: {
+  directoryInputId: string;
+  completionAction?: "qr" | "clipboard";
+}) {
   const [open, setOpen] = useState(false);
   const [includeGit, setIncludeGit] = useState(false);
   const [detail, setDetail] = useState<SourceArchiveProgressDetail>(initialDetail);
@@ -74,6 +81,10 @@ export function SourceArchiveProgressDialog({ directoryInputId }: { directoryInp
     window.dispatchEvent(new Event(SOURCE_ARCHIVE_SEND_EVENT));
   };
 
+  const copyToClipboard = () => {
+    window.dispatchEvent(new Event(SOURCE_ARCHIVE_COPY_EVENT));
+  };
+
   const complete = detail.state === "success";
   const failed = detail.state === "error";
   const waitingForPicker = detail.state === "running" && detail.percent === 0;
@@ -84,67 +95,67 @@ export function SourceArchiveProgressDialog({ directoryInputId }: { directoryInp
       <DialogTrigger asChild>
         <Button type="button" variant="outline"><FolderArchive />选择工程文件夹</Button>
       </DialogTrigger>
-      <DialogContent className="max-sm:overflow-y-auto">
+      <DialogContent className="source-archive-progress-dialog-style-01">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Archive className="size-5 text-blue-600" />
+          <DialogTitle className="source-archive-progress-dialog-style-02">
+            <Archive className="source-archive-progress-dialog-style-03" />
             {complete ? "工程压缩完成" : failed ? "工程压缩失败" : "准备工程压缩包"}
           </DialogTitle>
           <DialogDescription>浏览器授权目录后，筛选、读取和压缩均在本地Worker中完成。</DialogDescription>
         </DialogHeader>
 
-        <label className="flex items-start gap-3 rounded-xl border border-black/8 bg-zinc-50 p-4 text-left">
+        <label className="source-archive-progress-dialog-style-04">
           <Checkbox
             checked={includeGit}
             disabled={detail.state === "running" && !waitingForPicker}
             onCheckedChange={(checked) => setIncludeGit(checked === true)}
             aria-label="包含 Git 元数据"
           />
-          <span className="grid gap-1">
-            <strong className="text-sm text-zinc-900">包含 .git 文件</strong>
-            <span className="text-xs leading-relaxed text-zinc-500">默认不包含；启用后会保留提交历史和Git配置，压缩包可能明显增大。</span>
+          <span className="source-archive-progress-dialog-style-05">
+            <strong className="source-archive-progress-dialog-style-06">包含 .git 文件</strong>
+            <span className="source-archive-progress-dialog-style-07">默认不包含；启用后会保留提交历史和Git配置，压缩包可能明显增大。</span>
           </span>
         </label>
 
-        <ol className="grid grid-cols-2 gap-2 text-xs text-zinc-500 sm:grid-cols-4">
-          {["选择目录", "筛选源码", "Worker压缩", "下载或二维码发送"].map((step, index) => (
-            <li key={step} className="rounded-lg bg-zinc-100 px-3 py-2"><b className="mr-1 text-zinc-900">{index + 1}.</b>{step}</li>
+        <ol className="source-archive-progress-dialog-style-08">
+          {["选择目录", "筛选源码", "Worker压缩", completionAction === "qr" ? "下载或二维码发送" : "下载或复制到剪贴板"].map((step, index) => (
+            <li key={step} className="source-archive-progress-dialog-style-09"><b className="source-archive-progress-dialog-style-10">{index + 1}.</b>{step}</li>
           ))}
         </ol>
 
         {detail.state !== "idle" ? (
-          <div className="grid gap-3">
-            <div className="flex items-center justify-between gap-3 text-sm">
-              <span className="flex min-w-0 items-center gap-2 font-medium text-zinc-800">
-                <StatusIcon className={complete ? "size-4 text-emerald-600" : failed ? "size-4 text-red-600" : "size-4 animate-spin text-blue-600"} />
-                <span className="truncate">{detail.message}</span>
+          <div className="source-archive-progress-dialog-style-11">
+            <div className="source-archive-progress-dialog-style-12">
+              <span className="source-archive-progress-dialog-style-13">
+                <StatusIcon className={complete ? "source-archive-progress-dialog-style-14" : failed ? "source-archive-progress-dialog-style-15" : "source-archive-progress-dialog-style-16"} />
+                <span className="source-archive-progress-dialog-style-17">{detail.message}</span>
               </span>
-              <strong className="shrink-0 tabular-nums text-zinc-950">{Math.round(detail.percent)}%</strong>
+              <strong className="source-archive-progress-dialog-style-18">{Math.round(detail.percent)}%</strong>
             </div>
             <Progress value={detail.percent} aria-label="源码压缩进度" />
             {complete && detail.archiveName && detail.archiveBytes !== undefined ? (
-              <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+              <div className="source-archive-progress-dialog-style-19">
                 <strong>{detail.archiveName}</strong>
-                <span className="ml-2">发送文件大小 {formatBytes(detail.archiveBytes)}</span>
+                <span className="source-archive-progress-dialog-style-20">压缩文件大小 {formatBytes(detail.archiveBytes)}</span>
               </div>
             ) : null}
           </div>
         ) : null}
 
-        <div className="min-h-40 overflow-hidden rounded-xl bg-zinc-950 text-left text-zinc-200">
-          <div className="flex items-center gap-2 border-b border-white/10 px-4 py-2.5 text-xs font-semibold text-zinc-400">
-            <Terminal className="size-3.5" />处理日志
+        <div className="source-archive-progress-dialog-style-21">
+          <div className="source-archive-progress-dialog-style-22">
+            <Terminal className="checkbox-style-02" />处理日志
           </div>
-          <div className="max-h-52 overflow-y-auto p-4 font-mono text-xs leading-relaxed">
-            {logs.length === 0 ? <span className="text-zinc-600">等待开始…</span> : logs.map((log, index) => (
-              <div key={`${index}-${log}`} className="grid grid-cols-[18px_minmax(0,1fr)] gap-1.5">
-                <span className="text-zinc-600">›</span><span className="break-words">{log}</span>
+          <div className="source-archive-progress-dialog-style-23">
+            {logs.length === 0 ? <span className="source-archive-progress-dialog-style-24">等待开始…</span> : logs.map((log, index) => (
+              <div key={`${index}-${log}`} className="source-archive-progress-dialog-style-25">
+                <span className="source-archive-progress-dialog-style-24">›</span><span className="source-archive-progress-dialog-style-26">{log}</span>
               </div>
             ))}
           </div>
         </div>
 
-        <DialogFooter className="flex-wrap">
+        <DialogFooter className="source-archive-progress-dialog-style-27">
           {complete && detail.downloadUrl && detail.archiveName ? (
             <Button asChild variant="outline">
               <a href={detail.downloadUrl} download={detail.archiveName}><Download />下载压缩文件</a>
@@ -154,8 +165,11 @@ export function SourceArchiveProgressDialog({ directoryInputId }: { directoryInp
             <Button type="button" onClick={chooseDirectory}><FolderArchive />{waitingForPicker ? "重新选择" : "选择工程目录"}</Button>
           ) : null}
           {detail.state === "running" && !waitingForPicker ? <Button type="button" disabled>处理中…</Button> : null}
-          {complete ? (
+          {complete && completionAction === "qr" ? (
             <DialogClose asChild><Button type="button" onClick={sendByQr}>二维码发送</Button></DialogClose>
+          ) : null}
+          {complete && completionAction === "clipboard" ? (
+            <DialogClose asChild><Button type="button" onClick={copyToClipboard}>手动复制</Button></DialogClose>
           ) : null}
           {failed ? <DialogClose asChild><Button type="button">关闭</Button></DialogClose> : null}
         </DialogFooter>

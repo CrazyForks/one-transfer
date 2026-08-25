@@ -1,60 +1,2287 @@
-@import "tailwindcss";
-@import "tw-animate-css";
-
-@theme inline {
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
+*,
+::before,
+::after {
+  --tw-border-spacing-x: 0;
+  --tw-border-spacing-y: 0;
+  --tw-translate-x: 0;
+  --tw-translate-y: 0;
+  --tw-rotate: 0;
+  --tw-skew-x: 0;
+  --tw-skew-y: 0;
+  --tw-scale-x: 1;
+  --tw-scale-y: 1;
+  --tw-pan-x:  ;
+  --tw-pan-y:  ;
+  --tw-pinch-zoom:  ;
+  --tw-scroll-snap-strictness: proximity;
+  --tw-gradient-from-position:  ;
+  --tw-gradient-via-position:  ;
+  --tw-gradient-to-position:  ;
+  --tw-ordinal:  ;
+  --tw-slashed-zero:  ;
+  --tw-numeric-figure:  ;
+  --tw-numeric-spacing:  ;
+  --tw-numeric-fraction:  ;
+  --tw-ring-inset:  ;
+  --tw-ring-offset-width: 0px;
+  --tw-ring-offset-color: #fff;
+  --tw-ring-color: rgb(59 130 246 / 0.5);
+  --tw-ring-offset-shadow: 0 0 #0000;
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-shadow: 0 0 #0000;
+  --tw-shadow-colored: 0 0 #0000;
+  --tw-blur:  ;
+  --tw-brightness:  ;
+  --tw-contrast:  ;
+  --tw-grayscale:  ;
+  --tw-hue-rotate:  ;
+  --tw-invert:  ;
+  --tw-saturate:  ;
+  --tw-sepia:  ;
+  --tw-drop-shadow:  ;
+  --tw-backdrop-blur:  ;
+  --tw-backdrop-brightness:  ;
+  --tw-backdrop-contrast:  ;
+  --tw-backdrop-grayscale:  ;
+  --tw-backdrop-hue-rotate:  ;
+  --tw-backdrop-invert:  ;
+  --tw-backdrop-opacity:  ;
+  --tw-backdrop-saturate:  ;
+  --tw-backdrop-sepia:  ;
+  --tw-contain-size:  ;
+  --tw-contain-layout:  ;
+  --tw-contain-paint:  ;
+  --tw-contain-style:  ;
 }
+
+::backdrop {
+  --tw-border-spacing-x: 0;
+  --tw-border-spacing-y: 0;
+  --tw-translate-x: 0;
+  --tw-translate-y: 0;
+  --tw-rotate: 0;
+  --tw-skew-x: 0;
+  --tw-skew-y: 0;
+  --tw-scale-x: 1;
+  --tw-scale-y: 1;
+  --tw-pan-x:  ;
+  --tw-pan-y:  ;
+  --tw-pinch-zoom:  ;
+  --tw-scroll-snap-strictness: proximity;
+  --tw-gradient-from-position:  ;
+  --tw-gradient-via-position:  ;
+  --tw-gradient-to-position:  ;
+  --tw-ordinal:  ;
+  --tw-slashed-zero:  ;
+  --tw-numeric-figure:  ;
+  --tw-numeric-spacing:  ;
+  --tw-numeric-fraction:  ;
+  --tw-ring-inset:  ;
+  --tw-ring-offset-width: 0px;
+  --tw-ring-offset-color: #fff;
+  --tw-ring-color: rgb(59 130 246 / 0.5);
+  --tw-ring-offset-shadow: 0 0 #0000;
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-shadow: 0 0 #0000;
+  --tw-shadow-colored: 0 0 #0000;
+  --tw-blur:  ;
+  --tw-brightness:  ;
+  --tw-contrast:  ;
+  --tw-grayscale:  ;
+  --tw-hue-rotate:  ;
+  --tw-invert:  ;
+  --tw-saturate:  ;
+  --tw-sepia:  ;
+  --tw-drop-shadow:  ;
+  --tw-backdrop-blur:  ;
+  --tw-backdrop-brightness:  ;
+  --tw-backdrop-contrast:  ;
+  --tw-backdrop-grayscale:  ;
+  --tw-backdrop-hue-rotate:  ;
+  --tw-backdrop-invert:  ;
+  --tw-backdrop-opacity:  ;
+  --tw-backdrop-saturate:  ;
+  --tw-backdrop-sepia:  ;
+  --tw-contain-size:  ;
+  --tw-contain-layout:  ;
+  --tw-contain-paint:  ;
+  --tw-contain-style:  ;
+}
+
+/*
+! tailwindcss v3.4.17 | MIT License | https://tailwindcss.com
+*/
+
+/*
+1. Prevent padding and border from affecting element width. (https://github.com/mozdevs/cssremedy/issues/4)
+2. Allow adding a border to an element by just adding a border-width. (https://github.com/tailwindcss/tailwindcss/pull/116)
+*/
+
+*,
+::before,
+::after {
+  box-sizing: border-box;
+  /* 1 */
+  border-width: 0;
+  /* 2 */
+  border-style: solid;
+  /* 2 */
+  border-color: #e5e7eb;
+  /* 2 */
+}
+
+::before,
+::after {
+  --tw-content: '';
+}
+
+/*
+1. Use a consistent sensible line-height in all browsers.
+2. Prevent adjustments of font size after orientation changes in iOS.
+3. Use a more readable tab size.
+4. Use the user's configured `sans` font-family by default.
+5. Use the user's configured `sans` font-feature-settings by default.
+6. Use the user's configured `sans` font-variation-settings by default.
+7. Disable tap highlights on iOS
+*/
+
+html,
+:host {
+  line-height: 1.5;
+  /* 1 */
+  -webkit-text-size-adjust: 100%;
+  /* 2 */
+  /* 3 */
+  tab-size: 4;
+  /* 3 */
+  font-family: -apple-system, BlinkMacSystemFont, SF Pro Text, PingFang SC, Helvetica Neue, Arial, sans-serif;
+  /* 4 */
+  font-feature-settings: normal;
+  /* 5 */
+  font-variation-settings: normal;
+  /* 6 */
+  -webkit-tap-highlight-color: transparent;
+  /* 7 */
+}
+
+/*
+1. Remove the margin in all browsers.
+2. Inherit line-height from `html` so users can set them as a class directly on the `html` element.
+*/
+
+body {
+  margin: 0;
+  /* 1 */
+  line-height: inherit;
+  /* 2 */
+}
+
+/*
+1. Add the correct height in Firefox.
+2. Correct the inheritance of border color in Firefox. (https://bugzilla.mozilla.org/show_bug.cgi?id=190655)
+3. Ensure horizontal rules are visible by default.
+*/
+
+hr {
+  height: 0;
+  /* 1 */
+  color: inherit;
+  /* 2 */
+  border-top-width: 1px;
+  /* 3 */
+}
+
+/*
+Add the correct text decoration in Chrome, Edge, and Safari.
+*/
+
+abbr:where([title]) {
+  text-decoration: underline dotted;
+}
+
+/*
+Remove the default font size and weight for headings.
+*/
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+/*
+Reset links to optimize for opt-in styling instead of opt-out.
+*/
+
+a {
+  color: inherit;
+  text-decoration: inherit;
+}
+
+/*
+Add the correct font weight in Edge and Safari.
+*/
+
+b,
+strong {
+  font-weight: bolder;
+}
+
+/*
+1. Use the user's configured `mono` font-family by default.
+2. Use the user's configured `mono` font-feature-settings by default.
+3. Use the user's configured `mono` font-variation-settings by default.
+4. Correct the odd `em` font sizing in all browsers.
+*/
+
+code,
+kbd,
+samp,
+pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* 1 */
+  font-feature-settings: normal;
+  /* 2 */
+  font-variation-settings: normal;
+  /* 3 */
+  font-size: 1em;
+  /* 4 */
+}
+
+/*
+Add the correct font size in all browsers.
+*/
+
+small {
+  font-size: 80%;
+}
+
+/*
+Prevent `sub` and `sup` elements from affecting the line height in all browsers.
+*/
+
+sub,
+sup {
+  font-size: 75%;
+  line-height: 0;
+  position: relative;
+  vertical-align: baseline;
+}
+
+sub {
+  bottom: -0.25em;
+}
+
+sup {
+  top: -0.5em;
+}
+
+/*
+1. Remove text indentation from table contents in Chrome and Safari. (https://bugs.chromium.org/p/chromium/issues/detail?id=999088, https://bugs.webkit.org/show_bug.cgi?id=201297)
+2. Correct table border color inheritance in all Chrome and Safari. (https://bugs.chromium.org/p/chromium/issues/detail?id=935729, https://bugs.webkit.org/show_bug.cgi?id=195016)
+3. Remove gaps between table borders by default.
+*/
+
+table {
+  text-indent: 0;
+  /* 1 */
+  border-color: inherit;
+  /* 2 */
+  border-collapse: collapse;
+  /* 3 */
+}
+
+/*
+1. Change the font styles in all browsers.
+2. Remove the margin in Firefox and Safari.
+3. Remove default padding in all browsers.
+*/
+
+button,
+input,
+optgroup,
+select,
+textarea {
+  font-family: inherit;
+  /* 1 */
+  font-feature-settings: inherit;
+  /* 1 */
+  font-variation-settings: inherit;
+  /* 1 */
+  font-size: 100%;
+  /* 1 */
+  font-weight: inherit;
+  /* 1 */
+  line-height: inherit;
+  /* 1 */
+  letter-spacing: inherit;
+  /* 1 */
+  color: inherit;
+  /* 1 */
+  margin: 0;
+  /* 2 */
+  padding: 0;
+  /* 3 */
+}
+
+/*
+Remove the inheritance of text transform in Edge and Firefox.
+*/
+
+button,
+select {
+  text-transform: none;
+}
+
+/*
+1. Correct the inability to style clickable types in iOS and Safari.
+2. Remove default button styles.
+*/
+
+button,
+input:where([type='button']),
+input:where([type='reset']),
+input:where([type='submit']) {
+  -webkit-appearance: button;
+  /* 1 */
+  background-color: transparent;
+  /* 2 */
+  background-image: none;
+  /* 2 */
+}
+
+/*
+Use the modern Firefox focus style for all focusable elements.
+*/
+
+:-moz-focusring {
+  outline: auto;
+}
+
+/*
+Remove the additional `:invalid` styles in Firefox. (https://github.com/mozilla/gecko-dev/blob/2f9eacd9d3d995c937b4251a5557d95d494c9be1/layout/style/res/forms.css#L728-L737)
+*/
+
+:-moz-ui-invalid {
+  box-shadow: none;
+}
+
+/*
+Add the correct vertical alignment in Chrome and Firefox.
+*/
+
+progress {
+  vertical-align: baseline;
+}
+
+/*
+Correct the cursor style of increment and decrement buttons in Safari.
+*/
+
+::-webkit-inner-spin-button,
+::-webkit-outer-spin-button {
+  height: auto;
+}
+
+/*
+1. Correct the odd appearance in Chrome and Safari.
+2. Correct the outline style in Safari.
+*/
+
+[type='search'] {
+  -webkit-appearance: textfield;
+  /* 1 */
+  outline-offset: -2px;
+  /* 2 */
+}
+
+/*
+Remove the inner padding in Chrome and Safari on macOS.
+*/
+
+::-webkit-search-decoration {
+  -webkit-appearance: none;
+}
+
+/*
+1. Correct the inability to style clickable types in iOS and Safari.
+2. Change font properties to `inherit` in Safari.
+*/
+
+::-webkit-file-upload-button {
+  -webkit-appearance: button;
+  /* 1 */
+  font: inherit;
+  /* 2 */
+}
+
+/*
+Add the correct display in Chrome and Safari.
+*/
+
+summary {
+  display: list-item;
+}
+
+/*
+Removes the default spacing and border for appropriate elements.
+*/
+
+blockquote,
+dl,
+dd,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+hr,
+figure,
+p,
+pre {
+  margin: 0;
+}
+
+fieldset {
+  margin: 0;
+  padding: 0;
+}
+
+legend {
+  padding: 0;
+}
+
+ol,
+ul,
+menu {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/*
+Reset default styling for dialogs.
+*/
+
+dialog {
+  padding: 0;
+}
+
+/*
+Prevent resizing textareas horizontally by default.
+*/
+
+textarea {
+  resize: vertical;
+}
+
+/*
+1. Reset the default placeholder opacity in Firefox. (https://github.com/tailwindlabs/tailwindcss/issues/3300)
+2. Set the default placeholder color to the user's configured gray 400 color.
+*/
+
+input::placeholder,
+textarea::placeholder {
+  opacity: 1;
+  /* 1 */
+  color: #9ca3af;
+  /* 2 */
+}
+
+/*
+Set the default cursor for buttons.
+*/
+
+button,
+[role="button"] {
+  cursor: pointer;
+}
+
+/*
+Make sure disabled buttons don't get the pointer cursor.
+*/
+
+:disabled {
+  cursor: default;
+}
+
+/*
+1. Make replaced elements `display: block` by default. (https://github.com/mozdevs/cssremedy/issues/14)
+2. Add `vertical-align: middle` to align replaced elements more sensibly by default. (https://github.com/jensimmons/cssremedy/issues/14#issuecomment-634934210)
+   This can trigger a poorly considered lint error in some tools but is included by design.
+*/
+
+img,
+svg,
+video,
+canvas,
+audio,
+iframe,
+embed,
+object {
+  display: block;
+  /* 1 */
+  vertical-align: middle;
+  /* 2 */
+}
+
+/*
+Constrain images and videos to the parent width and preserve their intrinsic aspect ratio. (https://github.com/mozdevs/cssremedy/issues/14)
+*/
+
+img,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Make elements with the HTML hidden attribute stay hidden by default */
+
+[hidden]:where(:not([hidden="until-found"])) {
+  display: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: #f5f5f7;
+}
+
+body {
+  min-height: 100svh;
+  margin: 0;
+  color: #18181b;
+  background: #f5f5f7;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+
+
+@media (min-width: 640px) {
+  
+}
+
+@media (min-width: 768px) {
+  
+}
+
+@media (min-width: 1024px) {
+  
+}
+
+@media (min-width: 1280px) {
+  
+}
+
+@media (min-width: 1536px) {
+  
+}
+
+.dialog-style-07 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+.app-style-01,
+.app-style-26 {
+  pointer-events: none;
+}
+
+
+
+.dialog-style-01,
+.dialog-style-03,
+.app-update-checker-style-01,
+.app-style-01,
+.app-style-108 {
+  position: fixed;
+}
+
+.dialog-style-05,
+.slider-style-03,
+.app-style-26 {
+  position: absolute;
+}
+
+.progress-style-01,
+.slider-style-01,
+.slider-style-02,
+.tabs-style-01,
+.tabs-style-02,
+.app-style-08,
+.app-style-12,
+.app-style-13,
+.app-style-16,
+.app-style-27,
+.app-style-34,
+.app-style-36,
+.app-style-37,
+.app-style-39,
+.app-style-49,
+.app-style-82,
+.app-style-94,
+.app-style-101,
+.app-style-102,
+.app-style-103,
+.app-style-104,
+.app-style-110,
+.view-shell {
+  position: relative;
+}
+
+.app-style-05 {
+  position: sticky;
+}
+
+.dialog-style-01,
+.app-style-01 {
+  inset: 0px;
+}
+
+.app-style-108 {
+  left: 1rem;
+  right: 1rem;
+}
+
+.app-style-26 {
+  top: 0.25rem;
+  bottom: 0.25rem;
+}
+
+.app-update-checker-style-01 {
+  bottom: 1rem;
+}
+
+.app-style-42,
+.app-style-76 {
+  left: 0px;
+}
+
+.app-style-26 {
+  left: 0.25rem;
+}
+
+.dialog-style-03 {
+  left: 50%;
+}
+
+.app-update-checker-style-01 {
+  left: 1rem;
+}
+
+.dialog-style-05,
+.app-update-checker-style-01 {
+  right: 1rem;
+}
+
+.app-style-05,
+.app-style-42,
+.app-style-76 {
+  top: 0px;
+}
+
+.dialog-style-03 {
+  top: 50%;
+}
+
+.dialog-style-05,
+.app-style-108 {
+  top: 1rem;
+}
+
+.app-style-12,
+.view-shell {
+  isolation: isolate;
+}
+
+.tabs-style-02,
+.app-style-08,
+.app-style-13,
+.app-style-16,
+.app-style-27,
+.app-style-34,
+.app-style-36,
+.app-style-37,
+.app-style-39,
+.app-style-49,
+.app-style-94,
+.app-style-101,
+.app-style-102,
+.app-style-103,
+.app-style-104,
+.app-style-110 {
+  z-index: 10;
+}
+
+.app-style-05 {
+  z-index: 50;
+}
+
+.dialog-style-01,
+.app-style-01 {
+  z-index: 100;
+}
+
+.dialog-style-03 {
+  z-index: 101;
+}
+
+.app-update-checker-style-01 {
+  z-index: 80;
+}
+
+.app-style-108 {
+  z-index: 90;
+}
+
+.app-update-checker-style-01,
+.app-style-07,
+.app-style-12,
+.app-style-108,
+.view-shell {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.app-style-67 {
+  margin-bottom: 0.375rem;
+}
+
+.app-style-68,
+.app-style-73 {
+  margin-bottom: 0.5rem;
+}
+
+.app-style-34,
+.app-style-101 {
+  margin-bottom: 1rem;
+}
+
+.source-archive-progress-dialog-style-20 {
+  margin-left: 0.5rem;
+}
+
+.source-archive-progress-dialog-style-10 {
+  margin-right: 0.25rem;
+}
+
+.app-style-41,
+.app-style-54,
+.app-style-59,
+.app-style-61,
+.app-style-63 {
+  margin-top: 0.25rem;
+}
+
+.app-style-60,
+.app-style-72 {
+  margin-top: 0.5rem;
+}
+
+.app-style-56 {
+  margin-top: 0.625rem;
+}
+
+.app-style-93,
+.app-style-106 {
+  margin-top: 0.75rem;
+}
+
+.app-style-35 {
+  margin-top: 0.875rem;
+}
+
+.app-style-62,
+.app-style-89,
+.app-style-90,
+.app-style-107 {
+  margin-top: 1rem;
+}
+
+.app-style-15,
+.app-style-57 {
+  margin-top: 1.25rem;
+}
+
+.slider-style-04,
+.app-update-checker-style-05,
+.app-style-93 {
+  display: block;
+}
+
+
+
+.dialog-style-09,
+.slider-style-01,
+.app-update-checker-style-01,
+.source-archive-progress-dialog-style-02,
+.source-archive-progress-dialog-style-04,
+.source-archive-progress-dialog-style-12,
+.source-archive-progress-dialog-style-13,
+.source-archive-progress-dialog-style-22,
+.app-style-07,
+.app-style-08,
+.app-style-12,
+.app-style-27,
+.app-style-29,
+.app-style-52,
+.app-style-58,
+.app-style-66,
+.app-style-74,
+.app-style-100,
+.app-style-103,
+.view-shell {
+  display: flex;
+}
+
+.button-style-01,
+.tabs-style-02,
+.app-style-09,
+.app-style-107 {
+  display: inline-flex;
+}
+
+.dialog-style-03,
+.dialog-style-05,
+.dialog-style-08,
+.tabs-style-01,
+.source-archive-progress-dialog-style-05,
+.source-archive-progress-dialog-style-08,
+.source-archive-progress-dialog-style-11,
+.source-archive-progress-dialog-style-25,
+.app-style-01,
+.app-style-02,
+.app-style-05,
+.app-style-16,
+.app-style-19,
+.app-style-20,
+.app-style-22,
+.app-style-39,
+.app-style-46,
+.app-style-48,
+.app-style-81,
+.app-style-84,
+.app-style-89,
+.app-style-90,
+.app-style-91,
+.app-style-95,
+.app-style-96,
+.app-style-106 {
+  display: grid;
+}
+
+
+
+.app-style-45,
+.app-style-79 {
+  display: none;
+}
+
+.button-style-07 {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+.app-style-20 {
+  width: 3rem;
+  height: 3rem;
+}
+
+.checkbox-style-02 {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.dialog-style-06,
+.source-archive-progress-dialog-style-14,
+.source-archive-progress-dialog-style-15,
+.source-archive-progress-dialog-style-16,
+.app-style-10 {
+  width: 1rem;
+  height: 1rem;
+}
+
+.slider-style-04,
+.app-update-checker-style-02,
+.app-update-checker-style-03,
+.source-archive-progress-dialog-style-03,
+.app-style-24 {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.app-style-21 {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.dialog-style-05,
+.app-update-checker-style-07 {
+  width: 2rem;
+  height: 2rem;
+}
+
+.tabs-style-01 {
+  height: 2.75rem;
+}
+
+.button-style-05 {
+  height: 3rem;
+}
+
+.progress-style-01,
+.slider-style-02 {
+  height: 0.5rem;
+}
+
+.button-style-06 {
+  height: 2.25rem;
+}
+
+.app-style-42,
+.app-style-76 {
+  height: 100dvh;
+}
+
+.progress-style-02,
+.slider-style-03,
+.app-style-18,
+.app-style-19,
+.app-style-82,
+.app-style-83 {
+  height: 100%;
+}
+
+.source-archive-progress-dialog-style-23 {
+  max-height: 13rem;
+}
+
+.app-style-48 {
+  max-height: 30dvh;
+}
+
+.app-style-84 {
+  max-height: 38dvh;
+}
+
+.dialog-style-03 {
+  max-height: min(720px,calc(100dvh - 32px));
+}
+
+.app-style-82 {
+  max-height: 100%;
+}
+
+.app-style-42,
+.app-style-76 {
+  max-height: none;
+}
+
+.app-style-46,
+.app-style-81 {
+  min-height: 0px;
+}
+
+.app-style-05 {
+  min-height: 3.25rem;
+}
+
+.app-style-08 {
+  min-height: 3.5rem;
+}
+
+.source-archive-progress-dialog-style-21,
+.app-style-18 {
+  min-height: 10rem;
+}
+
+.app-style-27,
+.app-style-40 {
+  min-height: 11rem;
+}
+
+.app-style-37,
+.app-style-80,
+.app-style-102 {
+  min-height: 1.25rem;
+}
+
+.view-shell {
+  min-height: calc(100svh - 52px);
+}
+
+.app-style-12,
+.app-style-109 {
+  min-height: 100svh;
+}
+
+.dialog-style-03 {
+  width: calc(100% - 32px);
+}
+
+.app-style-26 {
+  width: calc(50% - 4px);
+}
+
+.app-style-42,
+.app-style-76 {
+  width: 100dvw;
+}
+
+.app-style-41 {
+  width: fit-content;
+}
+
+.progress-style-01,
+.progress-style-02,
+.slider-style-01,
+.slider-style-02,
+.app-style-12,
+.app-style-25,
+.app-style-27,
+.app-style-34,
+.app-style-36,
+.app-style-37,
+.app-style-38,
+.app-style-39,
+.app-style-40,
+.app-style-49,
+.app-style-73,
+.app-style-82,
+.app-style-83,
+.app-style-87,
+.app-style-94,
+.app-style-98,
+.app-style-101,
+.app-style-102,
+.app-style-103,
+.app-style-104,
+.view-shell {
+  width: 100%;
+}
+
+.app-update-checker-style-04,
+.source-archive-progress-dialog-style-13,
+.app-style-07,
+.app-style-22,
+.app-style-86 {
+  min-width: 0px;
+}
+
+.app-style-110 {
+  min-width: 4.25rem;
+}
+
+.app-style-75 {
+  min-width: 13rem;
+}
+
+.app-style-12 {
+  max-width: 1020px;
+}
+
+.app-style-33 {
+  max-width: 1200px;
+}
+
+.app-style-34,
+.app-style-36,
+.app-style-37,
+.app-style-38,
+.app-style-39,
+.app-style-51,
+.app-style-65,
+.view-shell {
+  max-width: 720px;
+}
+
+.app-style-32,
+.app-style-47 {
+  max-width: 100%;
+}
+
+.app-style-42,
+.app-style-76 {
+  max-width: none;
+}
+
+.dialog-style-03,
+.app-update-checker-style-01,
+.app-style-108 {
+  max-width: 36rem;
+}
+
+.app-update-checker-style-04,
+.app-style-86,
+.view-shell {
+  flex: 1 1 0%;
+}
+
+
+
+.button-style-01,
+.app-update-checker-style-02,
+.app-update-checker-style-03,
+.source-archive-progress-dialog-style-18,
+.app-style-48,
+.app-style-55,
+.app-style-85 {
+  flex-shrink: 0;
+}
+
+.slider-style-02 {
+  flex-grow: 1;
+}
+
+.dialog-style-03 {
+  --tw-translate-x: -50%;
+  transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+}
+
+.dialog-style-03 {
+  --tw-translate-y: -50%;
+  transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+}
+
+.app-style-42,
+.app-style-76 {
+  --tw-translate-x: 0px;
+  transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+}
+
+.app-style-42,
+.app-style-76 {
+  --tw-translate-y: 0px;
+  transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+}
+
+
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.app-update-checker-style-02,
+.source-archive-progress-dialog-style-16 {
+  animation: spin 1s linear infinite;
+}
+
+.app-style-31,
+.app-style-88 {
+  cursor: pointer;
+}
+
+.slider-style-01 {
+  touch-action: none;
+}
+
+.slider-style-01 {
+  user-select: none;
+}
+
+.app-style-40,
+.app-style-98 {
+  resize: vertical;
+}
+
+
+
+.app-style-94 {
+  scroll-margin-top: 5rem;
+}
+
+.app-style-16 {
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+.tabs-style-01,
+.source-archive-progress-dialog-style-08,
+.app-style-89 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.source-archive-progress-dialog-style-25 {
+  grid-template-columns: 18px minmax(0,1fr);
+}
+
+.app-style-05 {
+  grid-template-columns: 36px minmax(0,1fr) 36px;
+}
+
+.app-style-19 {
+  grid-template-columns: auto minmax(0,1fr) auto;
+}
+
+.app-style-42,
+.app-style-76 {
+  grid-template-rows: auto minmax(0,1fr) auto;
+}
+
+.app-style-12,
+.app-style-27,
+.app-style-100,
+.app-style-103,
+.view-shell {
+  flex-direction: column;
+}
+
+.source-archive-progress-dialog-style-27,
+.app-style-08,
+.app-style-29,
+.app-style-74 {
+  flex-wrap: wrap;
+}
+
+.dialog-style-05,
+.app-style-01,
+.app-style-20,
+.app-style-46,
+.app-style-81 {
+  place-items: center;
+}
+
+.source-archive-progress-dialog-style-04 {
+  align-items: flex-start;
+}
+
+.button-style-01,
+.slider-style-01,
+.tabs-style-02,
+.app-update-checker-style-01,
+.source-archive-progress-dialog-style-02,
+.source-archive-progress-dialog-style-12,
+.source-archive-progress-dialog-style-13,
+.source-archive-progress-dialog-style-22,
+.app-style-05,
+.app-style-08,
+.app-style-09,
+.app-style-19,
+.app-style-27,
+.app-style-29,
+.app-style-52,
+.app-style-66,
+.app-style-100,
+.app-style-103,
+.view-shell {
+  align-items: center;
+}
+
+.dialog-style-09 {
+  justify-content: flex-end;
+}
+
+.button-style-01,
+.tabs-style-02,
+.app-style-08,
+.app-style-12,
+.app-style-27,
+.app-style-29,
+.app-style-74,
+.app-style-100 {
+  justify-content: center;
+}
+
+.source-archive-progress-dialog-style-12,
+.app-style-05,
+.app-style-52,
+.app-style-58,
+.app-style-66 {
+  justify-content: space-between;
+}
+
+.app-style-39,
+.app-style-95,
+.app-style-96 {
+  justify-items: center;
+}
+
+.app-style-07 {
+  gap: 0.125rem;
+}
+
+.source-archive-progress-dialog-style-05,
+.app-style-22,
+.app-style-48,
+.app-style-91,
+.app-style-96 {
+  gap: 0.25rem;
+}
+
+.dialog-style-08,
+.source-archive-progress-dialog-style-25 {
+  gap: 0.375rem;
+}
+
+.app-style-12 {
+  gap: 3.5rem;
+}
+
+.button-style-01,
+.dialog-style-09,
+.source-archive-progress-dialog-style-02,
+.source-archive-progress-dialog-style-08,
+.source-archive-progress-dialog-style-13,
+.source-archive-progress-dialog-style-22,
+.app-style-09,
+.app-style-39,
+.app-style-42,
+.app-style-76,
+.app-style-89,
+.app-style-100,
+.app-style-106 {
+  gap: 0.5rem;
+}
+
+.app-style-29,
+.app-style-74 {
+  gap: 0.625rem;
+}
+
+.app-update-checker-style-01,
+.source-archive-progress-dialog-style-04,
+.source-archive-progress-dialog-style-11,
+.source-archive-progress-dialog-style-12,
+.app-style-02,
+.app-style-52,
+.app-style-66,
+.app-style-84,
+.app-style-90,
+.view-shell {
+  gap: 0.75rem;
+}
+
+.app-style-103 {
+  gap: 0.875rem;
+}
+
+.dialog-style-03,
+.app-style-16,
+.app-style-19,
+.app-style-27,
+.app-style-95 {
+  gap: 1rem;
+}
+
+.app-style-08 {
+  column-gap: 0.75rem;
+}
+
+.app-style-08 {
+  row-gap: 0.25rem;
+}
+
+.dialog-style-03,
+.progress-style-01,
+.slider-style-02,
+.source-archive-progress-dialog-style-21,
+.app-style-12,
+.app-style-46,
+.app-style-47,
+.app-style-81,
+.app-style-82,
+.view-shell {
+  overflow: hidden;
+}
+
+.app-style-33 {
+  overflow: visible;
+}
+
+.source-archive-progress-dialog-style-23,
+.app-style-48,
+.app-style-84 {
+  overflow-y: auto;
+}
+
+.source-archive-progress-dialog-style-17,
+.app-style-32,
+.app-style-61,
+.app-style-86 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.button-style-01 {
+  white-space: nowrap;
+}
+
+.source-archive-progress-dialog-style-26 {
+  overflow-wrap: break-word;
+}
+
+
+
+.dialog-style-03,
+.app-update-checker-style-01,
+.app-style-20,
+.app-style-27,
+.app-style-40,
+.app-style-46,
+.app-style-51,
+.app-style-65,
+.app-style-81,
+.app-style-84,
+.app-style-104 {
+  border-radius: 1rem;
+}
+
+.card-style-01,
+.app-style-17 {
+  border-radius: 1.5rem;
+}
+
+.button-style-01,
+.dialog-style-05,
+.progress-style-01,
+.slider-style-02,
+.slider-style-04,
+.app-style-06,
+.app-style-07,
+.app-style-110 {
+  border-radius: 9999px;
+}
+
+.tabs-style-02,
+.source-archive-progress-dialog-style-09,
+.app-style-26,
+.app-style-50,
+.app-style-92 {
+  border-radius: 0.5rem;
+}
+
+
+
+.app-style-42,
+.app-style-76 {
+  border-radius: 0px;
+}
+
+.tabs-style-01,
+.source-archive-progress-dialog-style-04,
+.source-archive-progress-dialog-style-19,
+.source-archive-progress-dialog-style-21,
+.app-style-47,
+.app-style-48,
+.app-style-87,
+.app-style-98,
+.app-style-108 {
+  border-radius: 0.75rem;
+}
+
+.button-style-03,
+.card-style-01,
+.dialog-style-03,
+.app-update-checker-style-01,
+.source-archive-progress-dialog-style-04,
+.app-style-27,
+.app-style-40,
+.app-style-48,
+.app-style-51,
+.app-style-65,
+.app-style-87,
+.app-style-92,
+.app-style-98,
+.app-style-104,
+.app-style-108 {
+  border-width: 1px;
+}
+
+.app-style-42,
+.app-style-76 {
+  border-width: 0px;
+}
+
+.slider-style-04 {
+  border-width: 2px;
+}
+
+.source-archive-progress-dialog-style-22,
+.app-style-05 {
+  border-bottom-width: 1px;
+}
+
+.app-style-08 {
+  border-top-width: 1px;
+}
+
+.button-style-03,
+.dialog-style-03,
+.app-update-checker-style-01,
+.app-style-40,
+.app-style-92,
+.app-style-98 {
+  border-color: rgb(0 0 0 / 0.1);
+}
+
+
+
+.source-archive-progress-dialog-style-04,
+.app-style-05 {
+  border-color: rgb(0 0 0 / 0.08);
+}
+
+.card-style-01,
+.app-style-08 {
+  border-color: rgb(0 0 0 / 0.06);
+}
+
+.app-style-27,
+.app-style-48,
+.app-style-51,
+.app-style-65,
+.app-style-87 {
+  border-color: rgb(0 0 0 / 0.07);
+}
+
+.slider-style-04 {
+  --tw-border-opacity: 1;
+  border-color: rgb(37 99 235 / var(--tw-border-opacity, 1));
+}
+
+.app-style-104 {
+  --tw-border-opacity: 1;
+  border-color: rgb(167 243 208 / var(--tw-border-opacity, 1));
+}
+
+.app-style-108 {
+  --tw-border-opacity: 1;
+  border-color: rgb(254 202 202 / var(--tw-border-opacity, 1));
+}
+
+.source-archive-progress-dialog-style-22 {
+  border-color: rgb(255 255 255 / 0.1);
+}
+
+.app-style-01 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(245 245 247 / var(--tw-bg-opacity, 1));
+}
+
+.app-style-05 {
+  background-color: rgb(245 245 247 / 0.85);
+}
+
+.app-style-81,
+.app-style-82 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(0 0 0 / var(--tw-bg-opacity, 1));
+}
+
+.dialog-style-01 {
+  background-color: rgb(0 0 0 / 0.55);
+}
+
+.app-style-20 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(239 246 255 / var(--tw-bg-opacity, 1));
+}
+
+.button-style-02,
+.progress-style-02,
+.slider-style-03 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(37 99 235 / var(--tw-bg-opacity, 1));
+}
+
+.source-archive-progress-dialog-style-19,
+.app-style-104 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(236 253 245 / var(--tw-bg-opacity, 1));
+}
+
+.app-style-108 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(254 242 242 / var(--tw-bg-opacity, 1));
+}
+
+.button-style-03,
+.card-style-01,
+.dialog-style-03,
+.slider-style-04,
+.app-update-checker-style-01,
+.app-style-26,
+.app-style-27,
+.app-style-40,
+.app-style-46,
+.app-style-47,
+.app-style-48,
+.app-style-51,
+.app-style-65,
+.app-style-84,
+.app-style-92,
+.app-style-112 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(255 255 255 / var(--tw-bg-opacity, 1));
+}
+
+.source-archive-progress-dialog-style-09,
+.app-style-42 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(244 244 245 / var(--tw-bg-opacity, 1));
+}
+
+.progress-style-01,
+.slider-style-02 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(228 228 231 / var(--tw-bg-opacity, 1));
+}
+
+.tabs-style-01 {
+  background-color: rgb(228 228 231 / 0.7);
+}
+
+.app-style-07 {
+  background-color: rgb(228 228 231 / 0.75);
+}
+
+.source-archive-progress-dialog-style-04,
+.app-style-50,
+.app-style-87,
+.app-style-98 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(250 250 250 / var(--tw-bg-opacity, 1));
+}
+
+.source-archive-progress-dialog-style-21,
+.app-style-76 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(9 9 11 / var(--tw-bg-opacity, 1));
+}
+
+.app-style-10 {
+  fill: currentColor;
+}
+
+.app-style-83 {
+  object-fit: contain;
+}
+
+.button-style-07 {
+  padding: 0px;
+}
+
+.tabs-style-01,
+.app-style-07,
+.app-style-47 {
+  padding: 0.25rem;
+}
+
+.app-style-48 {
+  padding: 0.375rem;
+}
+
+.app-style-42,
+.app-style-46,
+.app-style-76 {
+  padding: 0.5rem;
+}
+
+.app-update-checker-style-01,
+.source-archive-progress-dialog-style-04,
+.source-archive-progress-dialog-style-23,
+.app-style-40,
+.app-style-65,
+.app-style-84,
+.app-style-87,
+.app-style-98 {
+  padding: 1rem;
+}
+
+.app-style-51,
+.app-style-104 {
+  padding: 1.25rem;
+}
+
+.card-style-02,
+.dialog-style-03,
+.app-style-19,
+.app-style-27,
+.app-style-95 {
+  padding: 1.5rem;
+}
+
+
+
+.app-style-43,
+.app-style-77 {
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+}
+
+.app-style-05 {
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}
+
+.tabs-style-02,
+.source-archive-progress-dialog-style-09,
+.app-style-50,
+.app-style-64,
+.app-style-92,
+.app-style-110,
+.view-shell {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+
+.button-style-06,
+.source-archive-progress-dialog-style-19,
+.source-archive-progress-dialog-style-22,
+.app-style-08,
+.app-style-108 {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.app-style-12 {
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+}
+
+.button-style-05 {
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+.app-style-05,
+.app-style-110 {
+  padding-top: 0.375rem;
+  padding-bottom: 0.375rem;
+}
+
+.app-style-12 {
+  padding-top: 4rem;
+  padding-bottom: 4rem;
+}
+
+.source-archive-progress-dialog-style-09,
+.app-style-92 {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+.source-archive-progress-dialog-style-22,
+.app-style-50,
+.app-style-64 {
+  padding-top: 0.625rem;
+  padding-bottom: 0.625rem;
+}
+
+.source-archive-progress-dialog-style-19,
+.app-style-108 {
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+
+.app-style-08 {
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+.view-shell {
+  padding-top: 2rem;
+  padding-bottom: 2rem;
+}
+
+.dialog-style-08 {
+  padding-right: 2rem;
+}
+
+
+
+.dialog-style-08,
+.source-archive-progress-dialog-style-04,
+.source-archive-progress-dialog-style-21,
+.app-style-40,
+.app-style-49,
+.app-style-87,
+.app-style-98,
+.app-style-104 {
+  text-align: left;
+}
+
+.app-style-02,
+.app-style-08,
+.app-style-13,
+.app-style-27,
+.app-style-34,
+.app-style-37,
+.app-style-73,
+.app-style-88,
+.app-style-95,
+.app-style-101,
+.app-style-102,
+.app-style-103,
+.app-style-110,
+.view-shell {
+  text-align: center;
+}
+
+.app-style-55,
+.app-style-86 {
+  text-align: right;
+}
+
+.source-archive-progress-dialog-style-23,
+.app-style-37,
+.app-style-80,
+.app-style-98,
+.app-style-102 {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.app-style-23 {
+  font-size: 1.5rem;
+  line-height: 2rem;
+}
+
+.app-style-59,
+.app-style-61 {
+  font-size: 10px;
+}
+
+.app-style-63,
+.app-style-72,
+.app-style-97 {
+  font-size: 11px;
+}
+
+.app-style-15 {
+  font-size: clamp(17px,2vw,20px);
+}
+
+.page-heading {
+  font-size: clamp(32px,9vw,54px);
+}
+
+.app-style-03 {
+  font-size: clamp(34px,7vw,56px);
+}
+
+.app-style-14 {
+  font-size: clamp(46px,7vw,72px);
+}
+
+.app-style-35,
+.app-style-40,
+.app-style-44,
+.app-style-78,
+.app-style-105 {
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
+
+.dialog-style-10,
+.app-style-28 {
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+}
+
+.button-style-01,
+.dialog-style-11,
+.tabs-style-02,
+.app-update-checker-style-05,
+.source-archive-progress-dialog-style-06,
+.source-archive-progress-dialog-style-12,
+.source-archive-progress-dialog-style-19,
+.app-style-04,
+.app-style-09,
+.app-style-32,
+.app-style-39,
+.app-style-88,
+.app-style-92,
+.app-style-99,
+.app-style-106,
+.app-style-107,
+.app-style-108 {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.button-style-06,
+.app-update-checker-style-06,
+.source-archive-progress-dialog-style-07,
+.source-archive-progress-dialog-style-08,
+.source-archive-progress-dialog-style-22,
+.source-archive-progress-dialog-style-23,
+.app-style-11,
+.app-style-37,
+.app-style-53,
+.app-style-54,
+.app-style-55,
+.app-style-60,
+.app-style-62,
+.app-style-66,
+.app-style-80,
+.app-style-89,
+.app-style-91,
+.app-style-93,
+.app-style-98,
+.app-style-102,
+.app-style-110 {
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.app-style-03,
+.app-style-14,
+.app-style-23,
+.app-style-97,
+.page-heading {
+  font-weight: 700;
+}
+
+.source-archive-progress-dialog-style-13,
+.app-style-04,
+.app-style-09,
+.app-style-11,
+.app-style-58,
+.app-style-91,
+.app-style-99,
+.app-style-108 {
+  font-weight: 500;
+}
+
+.app-style-40 {
+  font-weight: 400;
+}
+
+.button-style-01,
+.dialog-style-10,
+.tabs-style-02,
+.source-archive-progress-dialog-style-22,
+.app-style-28,
+.app-style-39,
+.app-style-53,
+.app-style-55,
+.app-style-88,
+.app-style-107,
+.app-style-110 {
+  font-weight: 600;
+}
+
+.source-archive-progress-dialog-style-18 {
+  --tw-numeric-spacing: tabular-nums;
+  font-variant-numeric: var(--tw-ordinal) var(--tw-slashed-zero) var(--tw-numeric-figure) var(--tw-numeric-spacing) var(--tw-numeric-fraction);
+}
+
+.app-style-03,
+.app-style-14,
+.app-style-23,
+.page-heading {
+  line-height: 1;
+}
+
+.source-archive-progress-dialog-style-07,
+.source-archive-progress-dialog-style-23,
+.app-style-40,
+.app-style-62,
+.app-style-63,
+.app-style-98,
+.app-style-106 {
+  line-height: 1.625;
+}
+
+.app-style-03,
+.app-style-14 {
+  letter-spacing: -0.055em;
+}
+
+.page-heading {
+  letter-spacing: -0.05em;
+}
+
+.app-style-23 {
+  letter-spacing: -0.025em;
+}
+
+.app-style-97 {
+  letter-spacing: 0.05em;
+}
+
+.button-style-03,
+.source-archive-progress-dialog-style-03,
+.source-archive-progress-dialog-style-16,
+.app-style-20,
+.app-style-24,
+.app-style-55,
+.app-style-97 {
+  --tw-text-opacity: 1;
+  color: rgb(37 99 235 / var(--tw-text-opacity, 1));
+}
+
+.source-archive-progress-dialog-style-14 {
+  --tw-text-opacity: 1;
+  color: rgb(5 150 105 / var(--tw-text-opacity, 1));
+}
+
+.app-style-107 {
+  --tw-text-opacity: 1;
+  color: rgb(6 95 70 / var(--tw-text-opacity, 1));
+}
+
+.source-archive-progress-dialog-style-19,
+.app-style-105 {
+  --tw-text-opacity: 1;
+  color: rgb(6 78 59 / var(--tw-text-opacity, 1));
+}
+
+.app-style-106 {
+  color: rgb(2 44 34 / 0.8);
+}
+
+.source-archive-progress-dialog-style-15,
+.app-style-99 {
+  --tw-text-opacity: 1;
+  color: rgb(220 38 38 / var(--tw-text-opacity, 1));
+}
+
+.app-style-108 {
+  --tw-text-opacity: 1;
+  color: rgb(185 28 28 / var(--tw-text-opacity, 1));
+}
+
+.button-style-02,
+.checkbox-style-01,
+.app-style-76,
+.app-style-77,
+.app-style-78 {
+  --tw-text-opacity: 1;
+  color: rgb(255 255 255 / var(--tw-text-opacity, 1));
+}
+
+.source-archive-progress-dialog-style-21 {
+  --tw-text-opacity: 1;
+  color: rgb(228 228 231 / var(--tw-text-opacity, 1));
+}
+
+.dialog-style-05,
+.source-archive-progress-dialog-style-22,
+.app-style-11,
+.app-style-58,
+.app-style-61,
+.app-style-63,
+.app-style-71,
+.app-style-79,
+.app-style-80 {
+  --tw-text-opacity: 1;
+  color: rgb(161 161 170 / var(--tw-text-opacity, 1));
+}
+
+.dialog-style-11,
+.tabs-style-02,
+.app-update-checker-style-06,
+.source-archive-progress-dialog-style-07,
+.source-archive-progress-dialog-style-08,
+.app-style-04,
+.app-style-09,
+.app-style-15,
+.app-style-32,
+.app-style-35,
+.app-style-37,
+.app-style-39,
+.app-style-54,
+.app-style-62,
+.app-style-70,
+.app-style-91,
+.app-style-93,
+.app-style-102,
+.app-style-113 {
+  --tw-text-opacity: 1;
+  color: rgb(113 113 122 / var(--tw-text-opacity, 1));
+}
+
+.source-archive-progress-dialog-style-24,
+.app-style-88 {
+  --tw-text-opacity: 1;
+  color: rgb(82 82 91 / var(--tw-text-opacity, 1));
+}
+
+.button-style-04,
+.app-style-98 {
+  --tw-text-opacity: 1;
+  color: rgb(63 63 70 / var(--tw-text-opacity, 1));
+}
+
+.source-archive-progress-dialog-style-13 {
+  --tw-text-opacity: 1;
+  color: rgb(39 39 42 / var(--tw-text-opacity, 1));
+}
+
+.source-archive-progress-dialog-style-06,
+.source-archive-progress-dialog-style-10,
+.app-style-92 {
+  --tw-text-opacity: 1;
+  color: rgb(24 24 27 / var(--tw-text-opacity, 1));
+}
+
+.dialog-style-10,
+.source-archive-progress-dialog-style-18,
+.app-style-40,
+.app-style-53,
+.app-style-69,
+.app-style-84,
+.app-style-85,
+.app-style-112 {
+  --tw-text-opacity: 1;
+  color: rgb(9 9 11 / var(--tw-text-opacity, 1));
+}
+
+.app-style-107 {
+  text-decoration-line: underline;
+}
+
+.app-style-107 {
+  text-underline-offset: 4px;
+}
+
+.dialog-style-03 {
+  --tw-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  --tw-shadow-colored: 0 25px 50px -12px var(--tw-shadow-color);
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+}
+
+.button-style-01,
+.dialog-style-03,
+.slider-style-04,
+.tabs-style-02,
+.app-style-17,
+.app-style-40,
+.app-style-98 {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+.app-style-30 {
+  outline-style: solid;
+}
+
+
+
+
+
+.dialog-style-01 {
+  --tw-backdrop-blur: blur(2px);
+  backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia);
+}
+
+.app-style-05 {
+  --tw-backdrop-blur: blur(24px);
+  backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia);
+}
+
+
+
+.button-style-01 {
+  transition-property: color,background-color,border-color,transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+.app-style-18 {
+  transition-property: transform,border-color;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+.dialog-style-05,
+.tabs-style-02,
+.app-style-09,
+.app-style-110 {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+.progress-style-02,
+.slider-style-04,
+.app-style-24 {
+  transition-property: transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+.progress-style-02 {
+  transition-duration: 150ms;
+}
+
+.app-style-18 {
+  transition-duration: 200ms;
+}
+
+.progress-style-02 {
+  transition-timing-function: cubic-bezier(0, 0, 0.2, 1);
+}
+
+.app-style-02 {
+  will-change: transform;
+}
+
+@keyframes enter {
+  from {
+    opacity: var(--tw-enter-opacity, 1);
+    transform: translate3d(var(--tw-enter-translate-x, 0), var(--tw-enter-translate-y, 0), 0) scale3d(var(--tw-enter-scale, 1), var(--tw-enter-scale, 1), var(--tw-enter-scale, 1)) rotate(var(--tw-enter-rotate, 0));
+  }
+}
+
+@keyframes exit {
+  to {
+    opacity: var(--tw-exit-opacity, 1);
+    transform: translate3d(var(--tw-exit-translate-x, 0), var(--tw-exit-translate-y, 0), 0) scale3d(var(--tw-exit-scale, 1), var(--tw-exit-scale, 1), var(--tw-exit-scale, 1)) rotate(var(--tw-exit-rotate, 0));
+  }
+}
+
+.progress-style-02 {
+  animation-duration: 150ms;
+}
+
+.app-style-18 {
+  animation-duration: 200ms;
+}
+
+.progress-style-02 {
+  animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+}
+
+
 
 :root {
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.141 0.005 285.823);
-  --accent: oklch(0.967 0.001 286.375);
-  --accent-foreground: oklch(0.21 0.006 285.885);
-  --muted-foreground: oklch(0.552 0.016 285.938);
-  --border: oklch(0.92 0.004 286.32);
-  --destructive: oklch(0.577 0.245 27.325);
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 }
 
-@layer base {
-  * {
-    box-sizing: border-box;
-  }
-
-  html {
-    min-height: 100%;
-    background: #f5f5f7;
-  }
-
-  body {
-    min-height: 100svh;
-    margin: 0;
-    color: #18181b;
-    background: #f5f5f7;
-    font-family: var(--font-sans);
-    -webkit-font-smoothing: antialiased;
-  }
-
-  button,
-  input,
-  select,
-  textarea {
-    font: inherit;
-  }
-
-  [hidden] {
-    display: none !important;
-  }
-}
-
-.app-content {
+.app-content,
+.app-style-109 {
   visibility: visible;
   opacity: 1;
 }
@@ -72,11 +2299,15 @@
   }
 }
 
-.app-loading-fallback {
+.app-loading-fallback,
+.app-style-01 {
   animation: app-loading-fallback 1.1s ease-in-out forwards;
 }
 
-.status-line.error {
+.status-line.error,
+.app-style-37.error,
+.app-style-80.error,
+.app-style-102.error {
   padding: 11px 13px;
   color: #d70015;
   background: #fff0f1;
@@ -144,7 +2375,8 @@
   animation: 4s linear infinite sweep-shine;
 }
 
-.stage {
+.stage,
+.app-style-47 {
   scroll-margin-top: 76px;
 }
 
@@ -155,7 +2387,8 @@
   gap: clamp(6px, 1.4vw, 12px);
 }
 
-.stage canvas {
+.stage canvas,
+.app-style-47 canvas {
   display: block;
   width: 100%;
   height: auto;
@@ -163,7 +2396,8 @@
   image-rendering: pixelated;
 }
 
-.preview video {
+.preview video,
+.app-style-82 video {
   width: 100%;
   height: 100%;
   display: block;
@@ -311,8 +2545,8 @@ img.received {
   }
 
   *,
-  *::before,
-  *::after {
+*::before,
+*::after {
     scroll-behavior: auto !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
@@ -321,16 +2555,400 @@ img.received {
 }
 
 @media (max-width: 420px) {
-  .capture-actions {
+  .capture-actions,
+.app-style-74 {
     flex-direction: column;
   }
 
-  .capture-actions button {
+  .capture-actions button,
+.app-style-74 button {
     width: 100%;
   }
 
-  .preview {
+  .preview,
+.app-style-82 {
     aspect-ratio: 4 / 3;
     max-height: none;
   }
+}
+
+.slider-style-04:hover {
+  --tw-scale-x: 1.1;
+  --tw-scale-y: 1.1;
+  transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+}
+
+.button-style-03:hover {
+  border-color: rgb(59 130 246 / 0.3);
+}
+
+.button-style-04:hover {
+  background-color: rgb(0 0 0 / 0.05);
+}
+
+.button-style-03:hover {
+  --tw-bg-opacity: 1;
+  background-color: rgb(239 246 255 / var(--tw-bg-opacity, 1));
+}
+
+.button-style-02:hover {
+  --tw-bg-opacity: 1;
+  background-color: rgb(59 130 246 / var(--tw-bg-opacity, 1));
+}
+
+.dialog-style-05:hover {
+  --tw-bg-opacity: 1;
+  background-color: rgb(244 244 245 / var(--tw-bg-opacity, 1));
+}
+
+.dialog-style-05:hover {
+  --tw-text-opacity: 1;
+  color: rgb(24 24 27 / var(--tw-text-opacity, 1));
+}
+
+.button-style-04:hover,
+.app-style-09:hover,
+.app-style-113:hover {
+  --tw-text-opacity: 1;
+  color: rgb(9 9 11 / var(--tw-text-opacity, 1));
+}
+
+.app-style-40:focus,
+.app-style-98:focus {
+  --tw-border-opacity: 1;
+  border-color: rgb(59 130 246 / var(--tw-border-opacity, 1));
+}
+
+.app-style-40:focus,
+.app-style-98:focus {
+  --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
+  --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(4px + var(--tw-ring-offset-width)) var(--tw-ring-color);
+  box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
+}
+
+.app-style-40:focus,
+.app-style-98:focus {
+  --tw-ring-color: rgb(59 130 246 / 0.1);
+}
+
+.dialog-style-05:focus-visible,
+.app-style-09:focus-visible {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+.button-style-01:focus-visible,
+.dialog-style-05:focus-visible,
+.slider-style-04:focus-visible,
+.tabs-style-02:focus-visible,
+.app-style-09:focus-visible,
+.app-style-17:focus-visible {
+  --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
+  --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(4px + var(--tw-ring-offset-width)) var(--tw-ring-color);
+  box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
+}
+
+.button-style-01:focus-visible,
+.dialog-style-05:focus-visible,
+.tabs-style-02:focus-visible,
+.app-style-09:focus-visible,
+.app-style-17:focus-visible {
+  --tw-ring-color: rgb(59 130 246 / 0.15);
+}
+
+.slider-style-04:focus-visible {
+  --tw-ring-color: rgb(59 130 246 / 0.2);
+}
+
+.slider-style-04:active {
+  --tw-scale-x: .95;
+  --tw-scale-y: .95;
+  transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+}
+
+.button-style-01:active {
+  --tw-scale-x: 0.98;
+  --tw-scale-y: 0.98;
+  transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+}
+
+.button-style-01:disabled,
+.slider-style-04:disabled {
+  pointer-events: none;
+}
+
+
+
+.button-style-01:disabled,
+.slider-style-04:disabled {
+  opacity: 0.5;
+}
+
+.app-style-17:hover .app-style-18 {
+  --tw-translate-y: -0.25rem;
+  transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+}
+
+.app-style-17:hover .app-style-24 {
+  --tw-translate-x: 0.125rem;
+  transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+}
+
+.app-style-17:hover .app-style-18 {
+  border-color: rgb(59 130 246 / 0.25);
+}
+
+.dialog-style-02[data-state="closed"] {
+  display: none;
+}
+
+
+
+
+
+.tabs-style-02[data-state="active"] {
+  --tw-text-opacity: 1;
+  color: rgb(9 9 11 / var(--tw-text-opacity, 1));
+}
+
+@media not all and (min-width: 640px) {
+  .dialog-style-04 {
+    left: 0px;
+  }
+
+  .dialog-style-04 {
+    top: 0px;
+  }
+
+  .dialog-style-04 {
+    height: 100dvh;
+  }
+
+  .dialog-style-04 {
+    max-height: none;
+  }
+
+  .dialog-style-04 {
+    width: 100dvw;
+  }
+
+  .app-style-111 {
+    min-width: 0px;
+  }
+
+  .dialog-style-04 {
+    max-width: none;
+  }
+
+  .dialog-style-04 {
+    --tw-translate-x: 0px;
+    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+  }
+
+  .dialog-style-04 {
+    --tw-translate-y: 0px;
+    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+  }
+
+  .dialog-style-04 {
+    gap: 0.75rem;
+  }
+
+  .source-archive-progress-dialog-style-01 {
+    overflow-y: auto;
+  }
+
+  .dialog-style-04 {
+    border-radius: 0px;
+  }
+
+  .dialog-style-04 {
+    border-width: 0px;
+  }
+
+  .dialog-style-04 {
+    padding: 1rem;
+  }
+
+  .app-style-111 {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+
+  .app-style-111 {
+    font-size: 11px;
+  }
+}
+
+@media (min-width: 640px) {
+  .app-update-checker-style-01 {
+    left: auto;
+  }
+
+  .app-update-checker-style-01 {
+    margin-left: 0px;
+    margin-right: 0px;
+  }
+
+  .app-style-45,
+.app-style-79 {
+    display: block;
+  }
+
+  .app-style-05 {
+    min-height: 3.75rem;
+  }
+
+  .view-shell {
+    min-height: calc(100svh - 60px);
+  }
+
+  .app-style-90 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .source-archive-progress-dialog-style-08,
+.app-style-89 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .app-style-05 {
+    grid-template-columns: 44px auto 44px;
+  }
+
+  .app-style-100 {
+    flex-direction: row;
+  }
+
+  .app-style-48 {
+    gap: 0.5rem;
+  }
+
+  .app-style-42,
+.app-style-76 {
+    gap: 0.75rem;
+  }
+
+  .view-shell {
+    gap: 0.875rem;
+  }
+
+  .app-style-48 {
+    padding: 0.5rem;
+  }
+
+  .app-style-46 {
+    padding: 1rem;
+  }
+
+  .app-style-42,
+.app-style-76 {
+    padding: 1.25rem;
+  }
+
+  .app-style-05 {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .view-shell {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+
+  .app-style-05 {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+
+  .view-shell {
+    padding-top: clamp(42px,7vw,68px);
+    padding-bottom: clamp(42px,7vw,68px);
+  }
+
+  .app-style-44,
+.app-style-78 {
+    font-size: 1.125rem;
+    line-height: 1.75rem;
+  }
+}
+
+@media (min-width: 861px) {
+  .app-style-16 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .app-style-48 {
+    grid-template-columns: minmax(0,1fr) minmax(320px,0.55fr);
+  }
+
+  .app-style-19 {
+    padding: 1.75rem;
+  }
+}
+
+.button-style-01 svg {
+  pointer-events: none;
+}
+
+.button-style-01 svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.receiver-primary {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.875rem;
+  text-align: center;
+}
+
+.transfer-hud {
+  width: 100%;
+  padding-top: 0.125rem;
+  padding-right: 0.125rem;
+  padding-left: 0.125rem;
+}
+
+.progress-status {
+  display: flex;
+  gap: 0.875rem;
+  margin-top: 0.5rem;
+  color: #71717a;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.checkbox-control {
+  display: grid;
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
+  place-items: center;
+  border: 1px solid rgb(0 0 0 / 0.15);
+  border-radius: 0.375rem;
+  outline: none;
+  background: #fff;
+  transition: color 150ms, background-color 150ms, border-color 150ms;
+}
+
+.checkbox-control[data-state="checked"] {
+  border-color: #2563eb;
+  background: #2563eb;
+}
+
+.checkbox-control:focus-visible {
+  box-shadow: 0 0 0 4px rgb(59 130 246 / 0.15);
+}
+
+.checkbox-control:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }

@@ -1,6 +1,5 @@
 import { defineConfig } from "vite";
 import basicSsl from "@vitejs/plugin-basic-ssl";
-import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
 import { fileURLToPath, URL } from "node:url";
 
@@ -26,7 +25,6 @@ export default defineConfig({
         });
       },
     },
-    tailwindcss(),
     basicSsl(),
     VitePWA({
       registerType: "autoUpdate",
@@ -51,6 +49,10 @@ export default defineConfig({
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
+  },
+  build: {
+    target: "chrome109",
+    cssTarget: "chrome109",
   },
   server: { host: "127.0.0.1" },
 });

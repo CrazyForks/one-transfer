@@ -2,7 +2,6 @@ import * as React from "react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
-  ChevronDown,
   ChevronRight,
   ClipboardPaste,
   Download,
@@ -40,14 +39,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { SweepShine } from "@/components/ui/sweep-shine";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -80,8 +71,8 @@ const routeTitles: Record<RouteKey, string> = {
 };
 
 const viewShell =
-  "relative isolate mx-auto flex min-h-[calc(100svh-52px)] w-full max-w-[720px] flex-1 flex-col items-center gap-3 overflow-hidden px-3 py-8 text-center sm:min-h-[calc(100svh-60px)] sm:gap-3.5 sm:px-6 sm:py-[clamp(42px,7vw,68px)]";
-const headingClass = "text-[clamp(32px,9vw,54px)] leading-none font-bold tracking-[-0.05em]";
+  "view-shell";
+const headingClass = "page-heading";
 
 function routeFromPath(pathname: string): RouteKey {
   if (pathname === "/send") return "send";
@@ -94,15 +85,15 @@ function LoadingScreen({ overlayRef }: { overlayRef: React.RefObject<HTMLDivElem
   return (
     <div
       ref={overlayRef}
-      className="app-loading-fallback pointer-events-none fixed inset-0 z-[100] grid place-items-center bg-[#f5f5f7]"
+      className="app-style-01"
       role="status"
       aria-label="One Transfer 加载中"
     >
-      <div data-loading-mark className="grid gap-3 text-center will-change-transform">
-        <strong className="text-[clamp(34px,7vw,56px)] leading-none font-bold tracking-[-0.055em]">
+      <div data-loading-mark className="app-style-02">
+        <strong className="app-style-03">
           One Transfer
         </strong>
-        <SweepShine className="text-sm font-medium text-zinc-500">用光传递数据</SweepShine>
+        <SweepShine className="app-style-04">用光传递数据</SweepShine>
       </div>
     </div>
   );
@@ -121,20 +112,20 @@ function handleRouteClick(
 function Header({ route, transitionTo }: { route: RouteKey; transitionTo: (to: string) => void }) {
   const navClass = ({ isActive }: { isActive: boolean }) =>
     cn(
-      "relative z-10 min-w-17 rounded-full px-3 py-1.5 text-center text-xs font-semibold transition-colors",
-      "max-sm:min-w-0 max-sm:px-2 max-sm:text-[11px]",
-      isActive ? "bg-white text-zinc-950" : "text-zinc-500 hover:text-zinc-950",
+      "app-style-110",
+      "app-style-111",
+      isActive ? "app-style-112" : "app-style-113",
     );
 
   return (
     <header
       hidden={route === "home"}
-      className="sticky top-0 z-50 grid min-h-13 grid-cols-[36px_minmax(0,1fr)_36px] items-center justify-between border-b border-black/8 bg-[#f5f5f7]/85 px-2 py-1.5 backdrop-blur-xl sm:min-h-15 sm:grid-cols-[44px_auto_44px] sm:px-4 sm:py-2"
+      className="app-style-05"
     >
-      <Button asChild variant="ghost" size="icon" className="rounded-full" aria-label="返回首页">
+      <Button asChild variant="ghost" size="icon" className="app-style-06" aria-label="返回首页">
         <Link to="/" onClick={(event) => handleRouteClick(event, "/", transitionTo)}><ArrowLeft /></Link>
       </Button>
-      <nav className="mx-auto flex min-w-0 gap-0.5 rounded-full bg-zinc-200/75 p-1" aria-label="功能切换">
+      <nav className="app-style-07" aria-label="功能切换">
         <NavLink to="/send" className={navClass} onClick={(event) => handleRouteClick(event, "/send", transitionTo)}>发送</NavLink>
         <NavLink to="/receive" className={navClass} onClick={(event) => handleRouteClick(event, "/receive", transitionTo)}>接收</NavLink>
         <NavLink to="/clipboard" className={navClass} onClick={(event) => handleRouteClick(event, "/clipboard", transitionTo)}>剪贴板</NavLink>
@@ -146,19 +137,19 @@ function Header({ route, transitionTo }: { route: RouteKey; transitionTo: (to: s
 
 function Footer() {
   return (
-    <footer className="relative z-10 flex min-h-14 flex-wrap items-center justify-center gap-x-3 gap-y-1 border-t border-black/[0.06] px-4 py-4 text-center">
+    <footer className="app-style-08">
       <a
         href="https://github.com/zhihui-hu/one-transfer"
         target="_blank"
         rel="noreferrer"
-        className="inline-flex items-center gap-2 text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/15"
+        className="app-style-09"
       >
-        <svg viewBox="0 0 24 24" className="size-4 fill-current" aria-hidden="true">
+        <svg viewBox="0 0 24 24" className="app-style-10" aria-hidden="true">
           <path d="M12 .7a11.5 11.5 0 0 0-3.64 22.41c.58.11.79-.25.79-.56v-2.23c-3.22.7-3.9-1.37-3.9-1.37-.52-1.34-1.28-1.69-1.28-1.69-1.05-.72.08-.71.08-.71 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.57-.29-5.27-1.29-5.27-5.69 0-1.26.45-2.29 1.19-3.09-.12-.29-.52-1.47.11-3.05 0 0 .97-.31 3.16 1.18A10.9 10.9 0 0 1 12 6.11c.98 0 1.95.13 2.87.39 2.2-1.49 3.16-1.18 3.16-1.18.63 1.58.23 2.76.11 3.05.74.8 1.19 1.83 1.19 3.09 0 4.41-2.71 5.39-5.29 5.68.42.36.79 1.07.79 2.16v3.25c0 .31.21.68.8.56A11.5 11.5 0 0 0 12 .7Z" />
         </svg>
         github.com/zhihui-hu/one-transfer
       </a>
-      <span className="text-xs font-medium text-zinc-400">
+      <span className="app-style-11">
         v{__APP_VERSION__} · {__APP_COMMIT__ === "development" ? "dev" : __APP_COMMIT__.slice(0, 7)}
       </span>
     </footer>
@@ -176,25 +167,25 @@ function HomeView({ transitionTo }: { transitionTo: (to: string) => void }) {
     <main
       data-route-page
       data-view="home"
-      className="relative isolate mx-auto flex min-h-svh w-full max-w-[1020px] flex-col justify-center gap-14 overflow-hidden px-5 py-16"
+      className="app-style-12"
     >
-      <section data-reveal className="relative z-10 text-center">
-        <h1 className="text-[clamp(46px,7vw,72px)] leading-none font-bold tracking-[-0.055em]">One Transfer</h1>
-        <p data-breathe className="mt-5 text-[clamp(17px,2vw,20px)] text-zinc-500">用光传递数据</p>
+      <section data-reveal className="app-style-13">
+        <h1 className="app-style-14">One Transfer</h1>
+        <p data-breathe className="app-style-15">用光传递数据</p>
       </section>
-      <section className="relative z-10 grid grid-cols-1 gap-4 min-[861px]:grid-cols-3" aria-label="选择功能">
+      <section className="app-style-16" aria-label="选择功能">
         {transferCards.map(({ to, title, description, icon: Icon }) => (
-          <Link key={to} to={to} onClick={(event) => handleRouteClick(event, to, transitionTo)} data-reveal className="group rounded-3xl outline-none focus-visible:ring-4 focus-visible:ring-blue-500/15">
-            <Card className="h-full min-h-40 transition-[transform,border-color] duration-200 group-hover:-translate-y-1 group-hover:border-blue-500/25">
-              <CardContent className="grid h-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 p-6 lg:p-7">
-                <span className="grid size-12 place-items-center rounded-2xl bg-blue-50 text-blue-600">
-                  <Icon className="size-6" strokeWidth={1.8} />
+          <Link key={to} to={to} onClick={(event) => handleRouteClick(event, to, transitionTo)} data-reveal className="app-style-17">
+            <Card className="app-style-18">
+              <CardContent className="app-style-19">
+                <span className="app-style-20">
+                  <Icon className="app-style-21" strokeWidth={1.8} />
                 </span>
-                <span className="grid min-w-0 gap-1">
-                  <strong className="text-2xl leading-none font-bold tracking-tight">{title}</strong>
-                  <span className="text-sm text-zinc-500">{description}</span>
+                <span className="app-style-22">
+                  <strong className="app-style-23">{title}</strong>
+                  <span className="dialog-style-11">{description}</span>
                 </span>
-                <ChevronRight className="size-5 text-blue-600 transition-transform group-hover:translate-x-0.5" />
+                <ChevronRight className="app-style-24" />
               </CardContent>
             </Card>
           </Link>
@@ -244,8 +235,8 @@ function SendModeTabs() {
   return (
     <>
       <Tabs value={value} onValueChange={changeMode}>
-        <TabsList ref={listRef} className="w-full">
-          <span ref={indicatorRef} className="pointer-events-none absolute inset-y-1 left-1 w-[calc(50%-4px)] rounded-lg bg-white" />
+        <TabsList ref={listRef} className="app-style-25">
+          <span ref={indicatorRef} className="app-style-26" />
           <TabsTrigger value="file" data-tab-value="file">文件</TabsTrigger>
           <TabsTrigger value="snippet" data-tab-value="snippet">文字</TabsTrigger>
         </TabsList>
@@ -281,24 +272,24 @@ function FileSelectPanel({
     <div
       data-reveal
       id={panelId}
-      className="relative z-10 flex min-h-44 w-full flex-col items-center justify-center gap-4 rounded-2xl border border-black/[0.07] bg-white p-6 text-center"
+      className="app-style-27"
     >
-      <strong id={descriptionId} className="text-lg font-semibold">{description}</strong>
-      <div className="flex flex-wrap items-center justify-center gap-2.5">
-        <label htmlFor={inputId} className={cn(buttonVariants({ variant: "outline" }), "cursor-pointer")}>
+      <strong id={descriptionId} className="app-style-28">{description}</strong>
+      <div className="app-style-29">
+        <label htmlFor={inputId} className={cn(buttonVariants({ variant: "outline" }), "app-style-31")}>
           <Upload />选择文件
         </label>
         {directoryControl ?? (directoryInputId ? (
-          <label htmlFor={directoryInputId} className={cn(buttonVariants({ variant: "outline" }), "cursor-pointer")}>
+          <label htmlFor={directoryInputId} className={cn(buttonVariants({ variant: "outline" }), "app-style-31")}>
             <FolderArchive />{directoryLabel}
           </label>
         ) : null)}
       </div>
-      <input id={inputId} className="sr-only" type="file" />
+      <input id={inputId} className="dialog-style-07" type="file" />
       {directoryInputId ? (
         <input
           id={directoryInputId}
-          className="sr-only"
+          className="dialog-style-07"
           type="file"
           multiple
           {...{ webkitdirectory: "", directory: "" }}
@@ -307,59 +298,50 @@ function FileSelectPanel({
       {projectDirectoryInputId ? (
         <input
           id={projectDirectoryInputId}
-          className="sr-only"
+          className="dialog-style-07"
           type="file"
           multiple
           {...{ webkitdirectory: "", directory: "" }}
         />
       ) : null}
-      <span id={fileNameId} className="max-w-full truncate text-sm text-zinc-500">未选择文件或文件夹</span>
+      <span id={fileNameId} className="app-style-32">未选择文件或文件夹</span>
     </div>
   );
 }
 
-function ClipboardDirectoryMenu({
+function ClipboardDirectoryActions({
   directoryInputId,
   projectDirectoryInputId,
 }: {
   directoryInputId: string;
   projectDirectoryInputId: string;
 }) {
-  const openPicker = (inputId: string) => {
-    (document.getElementById(inputId) as HTMLInputElement | null)?.click();
-  };
-
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button type="button" variant="outline"><FolderArchive />选择文件夹<ChevronDown /></Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>选择文件夹类型</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => openPicker(directoryInputId)}>
-          <FolderOpen />
-          完整文件夹
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => openPicker(projectDirectoryInputId)}>
-          <FolderArchive />
-          前端 / Python 工程
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      <label
+        htmlFor={directoryInputId}
+        className={cn(buttonVariants({ variant: "outline" }), "app-style-31")}
+      >
+        <FolderOpen />完整文件夹
+      </label>
+      <SourceArchiveProgressDialog
+        directoryInputId={projectDirectoryInputId}
+        completionAction="clipboard"
+      />
+    </>
   );
 }
 
 function SendView() {
   return (
-    <main data-route-page data-view="send" className={cn(viewShell, "max-w-[1200px] overflow-visible")}>
-      <section data-reveal className="relative z-10 mb-4 w-full max-w-[720px] text-center">
+    <main data-route-page data-view="send" className={cn(viewShell, "app-style-33")}>
+      <section data-reveal className="app-style-34">
         <h1 id="tool-title" className={headingClass}>发送文件</h1>
-        <p data-breathe className="mt-3.5 text-base text-zinc-500">选择内容后，二维码会自动开始播放。</p>
+        <p data-breathe className="app-style-35">选择内容后，二维码会自动开始播放。</p>
       </section>
-      <div data-reveal className="relative z-10 w-full max-w-[720px]"><SendModeTabs /></div>
-      <div className="status-line relative z-10 min-h-5 w-full max-w-[720px] text-center font-mono text-xs text-zinc-500" id="specs">选择文件开始</div>
-      <div className="w-full max-w-[720px]">
+      <div data-reveal className="app-style-36"><SendModeTabs /></div>
+      <div className="app-style-37" id="specs">选择文件开始</div>
+      <div className="app-style-38">
         <FileSelectPanel
           panelId="pane-file"
           inputId="cfg-file"
@@ -370,10 +352,10 @@ function SendView() {
           fileNameId="send-file-name"
         />
       </div>
-      <div id="pane-snippet" hidden className="relative z-10 grid w-full max-w-[720px] justify-items-center gap-2 text-sm font-semibold text-zinc-500">
+      <div id="pane-snippet" hidden className="app-style-39">
         <label htmlFor="snippet-text" id="snippet-label">发送文字</label>
-        <textarea id="snippet-text" rows={7} placeholder="粘贴或输入文字" className="min-h-44 w-full resize-y rounded-2xl border border-black/10 bg-white p-4 text-left text-base leading-relaxed font-normal text-zinc-950 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10" />
-        <Button id="send-snippet" type="button" className="mt-1 w-fit">开始发送</Button>
+        <textarea id="snippet-text" rows={7} placeholder="粘贴或输入文字" className="app-style-40" />
+        <Button id="send-snippet" type="button" className="app-style-41">开始发送</Button>
       </div>
       <SendTransferDialog />
     </main>
@@ -402,14 +384,14 @@ function SendTransferDialog() {
       {hasTransfer ? <DialogTrigger asChild><Button type="button" variant="outline">查看二维码发送</Button></DialogTrigger> : null}
       <DialogContent
         persistent
-        className="top-0 left-0 h-dvh max-h-none w-dvw max-w-none translate-x-0 translate-y-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-2 rounded-none border-0 bg-zinc-100 p-2 sm:gap-3 sm:p-5"
+        className="app-style-42"
       >
-        <DialogHeader className="px-1">
-          <DialogTitle className="text-base sm:text-lg">二维码发送</DialogTitle>
-          <DialogDescription className="hidden sm:block">保持二维码完整可见；关闭弹窗后发送仍会在后台继续。</DialogDescription>
+        <DialogHeader className="app-style-43">
+          <DialogTitle className="app-style-44">二维码发送</DialogTitle>
+          <DialogDescription className="app-style-45">保持二维码完整可见；关闭弹窗后发送仍会在后台继续。</DialogDescription>
         </DialogHeader>
-        <div id="qr-display-area" className="grid min-h-0 place-items-center overflow-hidden rounded-2xl bg-white p-2 sm:p-4">
-          <div className="stage max-w-full overflow-hidden rounded-xl bg-white p-1" id="stage" hidden>
+        <div id="qr-display-area" className="app-style-46">
+          <div className="app-style-47" id="stage" hidden>
             <div id="qr-grid" className="qr-grid" aria-label="4 QR 高吞吐传输画面">
               {Array.from({ length: QR_GRID_CELLS }, (_, index) => (
                 <canvas
@@ -424,7 +406,7 @@ function SendTransferDialog() {
             </div>
           </div>
         </div>
-        <div className="grid max-h-[30dvh] shrink-0 gap-1 overflow-y-auto rounded-xl border border-black/[0.07] bg-white p-1.5 sm:gap-2 sm:p-2 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.55fr)]">
+        <div className="app-style-48">
           <SendBroadcastProgress compact />
           <TransferSpeedControl compact />
         </div>
@@ -479,21 +461,21 @@ function TransferSpeedControl({ compact = false }: { compact?: boolean }) {
       id="cfg-speed"
       data-speed-index={index}
       className={cn(
-        "relative z-10 w-full text-left",
-        compact ? "rounded-lg bg-zinc-50 px-3 py-2.5" : "max-w-[720px] rounded-2xl border border-black/[0.07] bg-white p-5",
+        "app-style-49",
+        compact ? "app-style-50" : "app-style-51",
       )}
     >
-      <div className="flex items-center justify-between gap-3">
+      <div className="app-style-52">
         <div>
-          <p className="text-xs font-semibold text-zinc-950">传输速度</p>
-          {!compact ? <p className="mt-1 text-xs text-zinc-500">自动选择当前电脑可承受的最高档位</p> : null}
+          <p className="app-style-53">传输速度</p>
+          {!compact ? <p className="app-style-54">自动选择当前电脑可承受的最高档位</p> : null}
         </div>
-        <output className="shrink-0 text-right text-xs font-semibold text-blue-600">
+        <output className="app-style-55">
           {profile.label} · 约 {rawKiBPerSecond} KiB/s
         </output>
       </div>
       <Slider
-        className={compact ? "mt-2.5" : "mt-5"}
+        className={compact ? "app-style-56" : "app-style-57"}
         value={[index]}
         min={0}
         max={SEND_SPEED_PROFILES.length - 1}
@@ -501,16 +483,16 @@ function TransferSpeedControl({ compact = false }: { compact?: boolean }) {
         aria-label="传输速度"
         onValueChange={changeSpeed}
       />
-      <div className={cn("flex justify-between font-medium text-zinc-400", compact ? "mt-1 text-[10px]" : "mt-2 text-xs")}>
+      <div className={cn("app-style-58", compact ? "app-style-59" : "app-style-60")}>
         <span>最低</span>
         <span>最高</span>
       </div>
       {compact ? (
-        <p className="mt-1 truncate text-[10px] text-zinc-400" aria-live="polite">{inspection}</p>
+        <p className="app-style-61" aria-live="polite">{inspection}</p>
       ) : (
         <>
-          <p className="mt-4 text-xs leading-relaxed text-zinc-500" aria-live="polite">{inspection}</p>
-          <p className="mt-1 text-[11px] leading-relaxed text-zinc-400">
+          <p className="app-style-62" aria-live="polite">{inspection}</p>
+          <p className="app-style-63">
             检测仅覆盖发送电脑；相机、远程桌面压缩和接收端性能不可见，识别不稳时请手动降档。
           </p>
         </>
@@ -540,13 +522,13 @@ function SendBroadcastProgress({ compact = false }: { compact?: boolean }) {
 
   if (!progress.active) return null;
   return (
-    <section className={cn("relative z-10 w-full text-left", compact ? "px-3 py-2.5" : "max-w-[720px] rounded-2xl border border-black/[0.07] bg-white p-4")} aria-live="polite">
-      <div className={cn("flex items-center justify-between gap-3 text-xs", compact ? "mb-1.5" : "mb-2")}>
-        <strong className="text-zinc-950">第 {progress.round} 轮广播 · {Math.floor(progress.percent)}%</strong>
-        <span className="text-zinc-500">{progress.emittedSymbols}/{progress.targetSymbols} symbols</span>
+    <section className={cn("app-style-49", compact ? "app-style-64" : "app-style-65")} aria-live="polite">
+      <div className={cn("app-style-66", compact ? "app-style-67" : "app-style-68")}>
+        <strong className="app-style-69">第 {progress.round} 轮广播 · {Math.floor(progress.percent)}%</strong>
+        <span className="app-style-70">{progress.emittedSymbols}/{progress.targetSymbols} symbols</span>
       </div>
       <Progress value={progress.percent} aria-label="发送广播进度" />
-      <p className={cn("text-zinc-400", compact ? "mt-1 text-[10px]" : "mt-2 text-[11px]")}>一轮建议symbol播放比例；是否完成以接收端为准。</p>
+      <p className={cn("app-style-71", compact ? "app-style-59" : "app-style-72")}>一轮建议symbol播放比例；是否完成以接收端为准。</p>
     </section>
   );
 }
@@ -561,51 +543,51 @@ function ReceiveView() {
 
   return (
     <main data-route-page data-view="receive" className={viewShell}>
-      <section className="receiver-primary relative z-10 flex w-full flex-col items-center gap-3.5 text-center">
-        <div data-reveal className="mb-2 w-full text-center">
+      <section className="receiver-primary">
+        <div data-reveal className="app-style-73">
           <h1 data-breathe className={headingClass}>接收</h1>
-          <p className="mt-3.5 text-base text-zinc-500">选择扫描方式后，在全屏窗口中查看画面和接收进度。</p>
+          <p className="app-style-35">选择扫描方式后，在全屏窗口中查看画面和接收进度。</p>
         </div>
-        <div data-reveal className="capture-actions flex flex-wrap justify-center gap-2.5" id="capture-actions">
-          <Button id="start" type="button" className="min-w-52" onClick={() => setCaptureOpen(true)}>扫描电脑屏幕</Button>
+        <div data-reveal className="app-style-74" id="capture-actions">
+          <Button id="start" type="button" className="app-style-75" onClick={() => setCaptureOpen(true)}>扫描电脑屏幕</Button>
           <Button id="start-camera" type="button" variant="outline" onClick={() => setCaptureOpen(true)}>使用相机</Button>
         </div>
         <Dialog open={captureOpen} onOpenChange={changeCaptureOpen}>
           <DialogContent
             persistent
-            className="top-0 left-0 h-dvh max-h-none w-dvw max-w-none translate-x-0 translate-y-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-2 rounded-none border-0 bg-zinc-950 p-2 text-white sm:gap-3 sm:p-5"
+            className="app-style-76"
           >
-            <DialogHeader className="px-1 text-white">
-              <DialogTitle className="text-base text-white sm:text-lg">实时扫描</DialogTitle>
-              <DialogDescription className="hidden text-zinc-400 sm:block">上方显示完整扫描画面，底部显示接收进度和解码状态。</DialogDescription>
-              <div className="status-line min-h-5 font-mono text-xs text-zinc-400" id="stats">选择扫描方式开始</div>
+            <DialogHeader className="app-style-77">
+              <DialogTitle className="app-style-78">实时扫描</DialogTitle>
+              <DialogDescription className="app-style-79">上方显示完整扫描画面，底部显示接收进度和解码状态。</DialogDescription>
+              <div className="app-style-80" id="stats">选择扫描方式开始</div>
             </DialogHeader>
-            <div className="grid min-h-0 place-items-center overflow-hidden rounded-2xl bg-black">
-              <div className="preview relative h-full max-h-full w-full overflow-hidden bg-black" id="preview" style={{ display: "none" }}>
-                <video id="video" muted playsInline className="h-full w-full object-contain" />
+            <div className="app-style-81">
+              <div className="app-style-82" id="preview" style={{ display: "none" }}>
+                <video id="video" muted playsInline className="app-style-83" />
               </div>
             </div>
-            <div className="grid max-h-[38dvh] gap-3 overflow-y-auto rounded-2xl bg-white p-4 text-zinc-950">
-              <div className="transfer-hud w-full px-0.5 pt-0.5">
+            <div className="app-style-84">
+              <div className="transfer-hud">
                 <div className="progress" id="progress" style={{ display: "none" }} role="progressbar" aria-label="接收进度" aria-valuemin={0} aria-valuemax={100} aria-valuenow={0}><div id="bar" /></div>
-                <div className="progress-status mt-2 flex gap-3.5 font-mono text-xs text-zinc-500" id="progress-status" style={{ display: "none" }} aria-live="polite">
-                  <strong id="progress-label" className="shrink-0 text-zinc-950">0% · 0帧</strong>
-                  <span id="eta-label" className="min-w-0 flex-1 truncate text-right">正在估算时间</span>
+                <div className="progress-status" id="progress-status" style={{ display: "none" }} aria-live="polite">
+                  <strong id="progress-label" className="app-style-85">0% · 0帧</strong>
+                  <span id="eta-label" className="app-style-86">正在估算时间</span>
                 </div>
               </div>
               <div id="result" />
-              <details id="diagnostics" className="w-full rounded-xl border border-black/[0.07] bg-zinc-50 p-4 text-left" style={{ display: "none" }}>
-                <summary className="cursor-pointer text-center text-sm font-semibold text-zinc-600">解码性能与诊断</summary>
-                <div id="metrics" className="mt-4 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+              <details id="diagnostics" className="app-style-87" style={{ display: "none" }}>
+                <summary className="app-style-88">解码性能与诊断</summary>
+                <div id="metrics" className="app-style-89">
                   <span>捕获 FPS <strong id="m-cap">—</strong></span><span>有效码 FPS <strong id="m-dec">—</strong></span><span>净带宽 <strong id="m-rate">—</strong></span><span>耗时 <strong id="m-time">—</strong></span>
                   <span>新帧/重复 <strong id="m-frames">—</strong></span><span>数据块 K <strong id="m-k">—</strong></span><span>块大小 <strong id="m-block">—</strong></span><span>负载 <strong id="m-payload">—</strong></span>
                 </div>
-                <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                  <label className="grid gap-1 text-xs font-medium text-zinc-500">解码宽度<select id="cfg-width" defaultValue="1280" className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-zinc-900"><option>960</option><option>1280</option><option>1920</option></select></label>
-                  <label className="grid gap-1 text-xs font-medium text-zinc-500">捕获 FPS<select id="cfg-capfps" defaultValue="60" className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-zinc-900"><option>30</option><option>60</option></select></label>
-                  <label className="grid gap-1 text-xs font-medium text-zinc-500">Worker数<select id="cfg-workers" defaultValue="2" className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-zinc-900"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
+                <div className="app-style-90">
+                  <label className="app-style-91">解码宽度<select id="cfg-width" defaultValue="1280" className="app-style-92"><option>960</option><option>1280</option><option>1920</option></select></label>
+                  <label className="app-style-91">捕获 FPS<select id="cfg-capfps" defaultValue="60" className="app-style-92"><option>30</option><option>60</option></select></label>
+                  <label className="app-style-91">Worker数<select id="cfg-workers" defaultValue="2" className="app-style-92"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
                 </div>
-                <span id="capture-actual" className="mt-3 block text-xs text-zinc-500" />
+                <span id="capture-actual" className="app-style-93" />
               </details>
               <DialogFooter><DialogClose asChild><Button type="button" variant="outline">停止扫描并关闭</Button></DialogClose></DialogFooter>
             </div>
@@ -653,12 +635,12 @@ function RestoreScriptPanel() {
   };
 
   return (
-    <Card id="restore-script-panel" data-reveal className="relative z-10 w-full scroll-mt-20">
-      <CardContent className="grid justify-items-center gap-4 p-6 text-center">
-        <div className="grid justify-items-center gap-1">
-          <span className="text-[11px] font-bold tracking-wider text-blue-600">WINDOWS 接收端 · 首次使用</span>
+    <Card id="restore-script-panel" data-reveal className="app-style-94">
+      <CardContent className="app-style-95">
+        <div className="app-style-96">
+          <span className="app-style-97">WINDOWS 接收端 · 首次使用</span>
           <strong>One Transfer 通用还原脚本</strong>
-          <span className="text-sm text-zinc-500">下载脚本，或复制下方源码并保存为 one-transfer-restore.bat；兼容 V1/V2。</span>
+          <span className="dialog-style-11">下载脚本，或复制下方源码并保存为 one-transfer-restore.bat；兼容 V1/V2。</span>
         </div>
         <textarea
           ref={textareaRef}
@@ -668,11 +650,11 @@ function RestoreScriptPanel() {
           spellCheck={false}
           aria-label="one-transfer-restore.bat 脚本源码"
           onFocus={(event) => event.currentTarget.select()}
-          className="w-full resize-y rounded-xl border border-black/10 bg-zinc-50 p-4 text-left font-mono text-xs leading-relaxed text-zinc-700 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+          className="app-style-98"
           placeholder="正在加载 one-transfer-restore.bat…"
         />
-        {error ? <span className="text-sm font-medium text-red-600">{error}</span> : null}
-        <div className="flex flex-col items-center justify-center gap-2 sm:flex-row">
+        {error ? <span className="app-style-99">{error}</span> : null}
+        <div className="app-style-100">
           <Button type="button" variant="outline" disabled={!script} onClick={() => void copyScript()}>
             <ClipboardPaste />{copyLabel}
           </Button>
@@ -688,41 +670,41 @@ function RestoreScriptPanel() {
 function ClipboardView() {
   return (
     <main data-route-page data-view="clipboard" className={viewShell}>
-      <section data-reveal className="relative z-10 mb-4 w-full text-center">
+      <section data-reveal className="app-style-101">
         <h1 className={headingClass}>通过文本剪贴板传文件或文件夹</h1>
-        <p data-breathe className="mt-3.5 text-base text-zinc-500">文件夹会包含全部文件和层级，自动打包后复制到 Windows 还原。</p>
+        <p data-breathe className="app-style-35">文件夹会包含全部文件和层级，自动打包后复制到 Windows 还原。</p>
       </section>
-      <div className="status-line relative z-10 min-h-5 w-full text-center font-mono text-xs text-zinc-500" id="clipboard-status" aria-live="polite">请选择要传递的文件或文件夹</div>
+      <div className="app-style-102" id="clipboard-status" aria-live="polite">请选择要传递的文件或文件夹</div>
       <FileSelectPanel
         inputId="clipboard-file"
         directoryInputId="clipboard-directory"
         projectDirectoryInputId="clipboard-project-directory"
         description="发送端 · 选择文件、文件夹或工程"
         directoryControl={(
-          <ClipboardDirectoryMenu
+          <ClipboardDirectoryActions
             directoryInputId="clipboard-directory"
             projectDirectoryInputId="clipboard-project-directory"
           />
         )}
         fileNameId="clipboard-file-name"
       />
-      <div data-reveal className="relative z-10 flex w-full flex-col items-center gap-3.5 text-center">
+      <div data-reveal className="app-style-103">
         <Button id="copy-transfer" type="button" disabled>复制数据到剪贴板</Button>
-        <span className="text-sm text-zinc-500">选择后自动复制；完整文件夹保留全部内容，工程会自动排除依赖和构建产物。</span>
+        <span className="dialog-style-11">选择后自动复制；完整文件夹保留全部内容，工程会自动排除依赖和构建产物。</span>
       </div>
       <section
         id="clipboard-next-step"
         hidden
         aria-live="polite"
-        className="relative z-10 w-full rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-left"
+        className="app-style-104"
       >
-        <strong className="text-base text-emerald-900">复制成功，下一步到 Windows 恢复</strong>
-        <ol className="mt-3 grid gap-2 text-sm leading-relaxed text-emerald-950/80">
+        <strong className="app-style-105">复制成功，下一步到 Windows 恢复</strong>
+        <ol className="app-style-106">
           <li><b>1.</b> 切换到 Windows，等待远程剪贴板同步完成。</li>
           <li><b>2.</b> 将下方的 <code>one-transfer-restore.bat</code> 放到希望保存文件的目录。</li>
           <li><b>3.</b> 双击运行脚本；脚本会读取剪贴板、校验数据并恢复文件，文件夹会自动解压。</li>
         </ol>
-        <a href="#restore-script-panel" className="mt-4 inline-flex text-sm font-semibold text-emerald-800 underline underline-offset-4">
+        <a href="#restore-script-panel" className="app-style-107">
           查看或下载 Windows 还原脚本
         </a>
       </section>
@@ -736,7 +718,7 @@ type RouteOutletContext = { transitionTo: (to: string) => void };
 function ControllerError({ message }: { message: string | null }) {
   if (!message) return null;
   return (
-    <div className="fixed inset-x-4 top-4 z-[90] mx-auto max-w-xl rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+    <div className="app-style-108">
       {message}
     </div>
   );
@@ -892,7 +874,7 @@ function TransferLayout() {
   return (
     <>
       {loaderVisible ? <LoadingScreen overlayRef={overlayRef} /> : null}
-      <div ref={contentRef} className="app-content min-h-svh">
+      <div ref={contentRef} className="app-style-109">
         <Header route={route} transitionTo={transitionTo} />
         <Outlet context={{ transitionTo } satisfies RouteOutletContext} />
         <Footer />

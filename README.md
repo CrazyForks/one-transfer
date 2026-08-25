@@ -8,8 +8,6 @@
   <img src="https://img.shields.io/badge/React-19-20232A?logo=react&logoColor=61DAFB" alt="React 19" />
   <img src="https://img.shields.io/badge/Vite-6-646CFF?logo=vite&logoColor=white" alt="Vite 6" />
   <img src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white" alt="TypeScript 5" />
-  <img src="https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwind-css&logoColor=white" alt="Tailwind CSS 4" />
-  <img src="https://img.shields.io/badge/shadcn%2Fui-black?logo=shadcnui&logoColor=white" alt="shadcn/ui" />
   <img src="https://img.shields.io/badge/GSAP-3-0AE448?logo=greensock&logoColor=black" alt="GSAP 3" />
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License" />
 </p>
@@ -24,7 +22,7 @@ Repository: [github.com/zhihui-hu/one-transfer](https://github.com/zhihui-hu/one
 - **Layered integrity:** validate container structure, lengths, FNV-1a, gzip bounds, and SHA-256.
 - **Local processing:** business files never upload to the application server.
 - **Offline operation:** PWA caching includes the SPA, worker, WASM decoder, and Windows restorer.
-- **Modern UI:** React Router, Tailwind CSS, shadcn/ui, and reduced-motion-aware GSAP transitions.
+- **Modern UI:** React Router, native static CSS, local components, and reduced-motion-aware GSAP transitions.
 
 ## 🚀 Quick Start
 
@@ -249,7 +247,7 @@ channel is text-only.
 
 - React 19, Vite 6, and TypeScript 5
 - React Router 7 with a persistent `BrowserRouter` layout
-- Tailwind CSS 4 and local shadcn/ui components
+- Native static CSS and local components
 - GSAP 3 for loading, route, Tabs, and ambient breathing motion
 - `qrcode` for QR generation
 - `zxing-wasm` in Web Workers for QR decoding
@@ -489,7 +487,7 @@ Each QR frame contains a 20-byte little-endian header followed by one encoded bl
 
 The high-throughput layout keeps four independently decodable QR symbols visible, but replaces only one
 cell on each visual tick. The Balanced preset emits 60 symbols per second at 1465 bytes per symbol; the
-20-byte header leaves a 1445-byte encoded block. QR error-correction level L is used. A single shadcn/ui
+20-byte header leaves a 1445-byte encoded block. QR error-correction level L is used. A single
 speed slider combines the frame-size and tick-rate choices into Stable, Balanced, and Fast presets;
 difficult displays or cameras should move it toward the minimum.
 
@@ -657,10 +655,10 @@ one-transfer/
 ├── src/
 │   ├── main.tsx               # React root and BrowserRouter
 │   ├── app.tsx                # Persistent routes, views, loading, and GSAP
-│   ├── styles.css             # Tailwind entry and dynamic controller styles
-│   ├── components/            # Build info, update checker, and local shadcn/ui
+│   ├── styles.css             # Chrome 109-compatible static and controller styles
+│   ├── components/            # Build info, update checker, and local components
 │   ├── lib/device-capabilities.ts # Browser capability inspection
-│   └── lib/utils.ts           # shadcn/ui class merging helper
+│   └── lib/utils.ts           # Class merging helper
 ├── send/main.ts               # Container creation, LT encoding, QR playback
 ├── receive/
 │   ├── main.ts                # Capture, progress, recovery, result UI

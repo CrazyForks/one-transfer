@@ -66,12 +66,12 @@ export function AppUpdateChecker() {
     <aside
       role="alert"
       aria-live="polite"
-      className="fixed right-4 bottom-4 left-4 z-[80] mx-auto flex max-w-xl items-center gap-3 rounded-2xl border border-black/10 bg-white p-4 sm:left-auto sm:mx-0"
+      className="app-update-checker-style-01"
     >
-      <RefreshCw className={pending ? "size-5 shrink-0 animate-spin" : "size-5 shrink-0"} />
-      <div className="min-w-0 flex-1">
-        <strong className="block text-sm">发现新版本</strong>
-        <span className="text-xs text-zinc-500">更新后即可使用最新功能和修复。</span>
+      <RefreshCw className={pending ? "app-update-checker-style-02" : "app-update-checker-style-03"} />
+      <div className="app-update-checker-style-04">
+        <strong className="app-update-checker-style-05">发现新版本</strong>
+        <span className="app-update-checker-style-06">更新后即可使用最新功能和修复。</span>
       </div>
       <Button type="button" size="sm" disabled={pending} onClick={update}>
         <SweepShine>{pending ? "正在更新…" : "更新"}</SweepShine>
@@ -80,7 +80,7 @@ export function AppUpdateChecker() {
         type="button"
         size="icon"
         variant="ghost"
-        className="size-8"
+        className="app-update-checker-style-07"
         aria-label="关闭更新提示"
         disabled={pending}
         onClick={() => setAvailable(false)}

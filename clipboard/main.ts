@@ -10,6 +10,13 @@ import {
 import { formatBytes } from "../shared/format";
 import { statusLine } from "../shared/status-line";
 import { createSourceArchiveInWorker } from "../shared/source-archive-client";
+import {
+  SOURCE_ARCHIVE_COPY_EVENT,
+  SOURCE_ARCHIVE_OPTIONS_EVENT,
+  SOURCE_ARCHIVE_PROGRESS_EVENT,
+  type SourceArchiveOptionsDetail,
+  type SourceArchiveProgressDetail,
+} from "../shared/source-archive-events";
 
 export function mountClipboard() {
 const fileInput = document.getElementById("clipboard-file") as HTMLInputElement;
@@ -30,6 +37,8 @@ let payload: string | null = null;
 let selectedName = "";
 let generation = 0;
 let processingAbortController: AbortController | null = null;
+let sourceArchiveDownloadUrl: string | null = null;
+let sourceArchiveOptions: SourceArchiveOptionsDetail = { includeGit: false };
 let selected: {
   itemType: "file" | "directory";
   name: string;
@@ -55,6 +64,24 @@ function beginProcessing(): { currentGeneration: number; signal: AbortSignal } {
   return { currentGeneration: ++generation, signal: processingAbortController.signal };
 }
 
+function reportSourceArchive(detail: SourceArchiveProgressDetail): void {
+  window.dispatchEvent(new CustomEvent<SourceArchiveProgressDetail>(SOURCE_ARCHIVE_PROGRESS_EVENT, { detail }));
+}
+
+function revokeSourceArchiveDownload(): void {
+  if (!sourceArchiveDownloadUrl) return;
+  URL.revokeObjectURL(sourceArchiveDownloadUrl);
+  sourceArchiveDownloadUrl = null;
+}
+
+const onSourceArchiveOptions = (event: Event) => {
+  sourceArchiveOptions = (event as CustomEvent<SourceArchiveOptionsDetail>).detail;
+};
+
+const onSourceArchiveCopy = () => {
+  void copyTransfer(false);
+};
+
 function showToast(message: string, tone: "success" | "error"): void {
   clearTimeout(toastTimer);
   toast.textContent = message;
@@ -67,6 +94,8 @@ function showToast(message: string, tone: "success" | "error"): void {
 }
 
 async function prepareFile(): Promise<void> {
+  revokeSourceArchiveDownload();
+  reportSourceArchive({ state: "idle", percent: 0, message: "" });
   const file = fileInput.files?.[0];
   const { currentGeneration, signal } = beginProcessing();
   payload = null;
@@ -112,6 +141,8 @@ async function prepareFile(): Promise<void> {
 }
 
 async function prepareDirectory(): Promise<void> {
+  revokeSourceArchiveDownload();
+  reportSourceArchive({ state: "idle", percent: 0, message: "" });
   const files = [...(directoryInput.files ?? [])];
   const { currentGeneration, signal } = beginProcessing();
   payload = null;
@@ -174,6 +205,7 @@ async function prepareDirectory(): Promise<void> {
 }
 
 async function prepareProjectDirectory(): Promise<void> {
+  revokeSourceArchiveDownload();
   const files = [...(projectDirectoryInput.files ?? [])];
   const { currentGeneration, signal } = beginProcessing();
   payload = null;
@@ -187,8 +219,8 @@ async function prepareProjectDirectory(): Promise<void> {
 
   const rootName = files[0]?.webkitRelativePath.replace(/\\/g, "/").split("/")[0] ?? "";
   fileNameLabel.textContent = `${rootName} · 正在筛选工程文件…`;
-  const automaticWrite = beginDeferredClipboardWrite();
   status.showLoading(`正在 Worker 中筛选并压缩 ${rootName}…`);
+  reportSourceArchive({ state: "running", percent: 1, message: `已选择 ${rootName}，准备启动 Worker` });
   try {
     const archive = await createSourceArchiveInWorker(
       files,
@@ -197,28 +229,48 @@ async function prepareProjectDirectory(): Promise<void> {
       (progress) => {
         if (currentGeneration !== generation) return;
         status.showLoading(`${progress.message} · ${Math.round(progress.percent)}%`);
+        reportSourceArchive({ state: "running", ...progress });
       },
-      { maxInputBytes: Number.POSITIVE_INFINITY },
+      { ...sourceArchiveOptions, maxInputBytes: Number.POSITIVE_INFINITY },
     );
     if (currentGeneration !== generation) {
-      automaticWrite?.reject(new Error("工程选择已变更"));
       return;
     }
     fileNameLabel.textContent =
       `${rootName} · 保留 ${archive.includedFileCount.toLocaleString()} 个` +
       ` · 排除 ${archive.excludedFileCount.toLocaleString()} 个`;
+    const archiveByteLength = archive.bytes.length;
+    sourceArchiveDownloadUrl = URL.createObjectURL(new Blob([archive.bytes as BlobPart], { type: "application/zip" }));
     selected = {
       itemType: "directory",
       name: rootName,
       bytes: archive.bytes,
       mediaType: "application/zip",
-      detail: `工程源码 · ZIP ${formatBytes(archive.bytes.length)}`,
+      detail: `工程源码 · ZIP ${formatBytes(archiveByteLength)}`,
     };
-    await encodeSelected(currentGeneration, automaticWrite, signal);
+    reportSourceArchive({
+      state: "running",
+      percent: 96,
+      message: "ZIP 已生成，正在 Worker 中压缩并编码剪贴板数据",
+      archiveName: archive.name,
+      archiveBytes: archiveByteLength,
+      downloadUrl: sourceArchiveDownloadUrl,
+    });
+    const encoded = await encodeSelected(currentGeneration, null, signal, false);
+    if (!encoded) return;
+    reportSourceArchive({
+      state: "success",
+      percent: 100,
+      message: `工程已准备完成：${archive.name} · ${formatBytes(archiveByteLength)}`,
+      archiveName: archive.name,
+      archiveBytes: archiveByteLength,
+      downloadUrl: sourceArchiveDownloadUrl,
+    });
   } catch (error) {
-    automaticWrite?.reject(error);
     if (currentGeneration !== generation) return;
-    status.showError(error instanceof Error ? error.message : "工程压缩失败，请重新选择");
+    const message = error instanceof Error ? error.message : "工程压缩失败，请重新选择";
+    status.showError(message);
+    reportSourceArchive({ state: "error", percent: 0, message });
     copyButton.textContent = "复制工程数据到剪贴板";
   }
 }
@@ -227,8 +279,9 @@ async function encodeSelected(
   expectedGeneration: number,
   automaticWrite: DeferredClipboardWrite | null,
   signal: AbortSignal,
-): Promise<void> {
-  if (!selected) return;
+  automaticCopy = true,
+): Promise<boolean> {
+  if (!selected) return false;
   const item = selected;
   payload = null;
   copyButton.disabled = true;
@@ -246,15 +299,17 @@ async function encodeSelected(
     );
     if (expectedGeneration !== generation) {
       automaticWrite?.reject(new Error("编码设置已变更"));
-      return;
+      return false;
     }
     applyEncodedItem(item, encoded, originalSize);
     automaticWrite?.resolve(encoded.text);
-    await copyTransfer(true, expectedGeneration, automaticWrite?.result);
+    if (automaticCopy) await copyTransfer(true, expectedGeneration, automaticWrite?.result);
+    return true;
   } catch (error) {
     automaticWrite?.reject(error);
-    if (expectedGeneration !== generation) return;
+    if (expectedGeneration !== generation) return false;
     status.showError(error instanceof Error ? error.message : "编码文件失败，请重试");
+    return false;
   }
 }
 
@@ -378,6 +433,8 @@ fileInput.addEventListener("change", () => void prepareFile());
 directoryInput.addEventListener("change", () => void prepareDirectory());
 projectDirectoryInput.addEventListener("change", () => void prepareProjectDirectory());
 copyButton.addEventListener("click", () => void copyTransfer());
+window.addEventListener(SOURCE_ARCHIVE_OPTIONS_EVENT, onSourceArchiveOptions);
+window.addEventListener(SOURCE_ARCHIVE_COPY_EVENT, onSourceArchiveCopy);
 return () => {
   processingAbortController?.abort();
   processingAbortController = null;
@@ -386,5 +443,9 @@ return () => {
   toast.remove();
   payload = null;
   selected = null;
+  window.removeEventListener(SOURCE_ARCHIVE_OPTIONS_EVENT, onSourceArchiveOptions);
+  window.removeEventListener(SOURCE_ARCHIVE_COPY_EVENT, onSourceArchiveCopy);
+  revokeSourceArchiveDownload();
+  reportSourceArchive({ state: "idle", percent: 0, message: "" });
 };
 }
