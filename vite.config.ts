@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import basicSsl from "@vitejs/plugin-basic-ssl";
 import { VitePWA } from "vite-plugin-pwa";
+import { copyFileSync } from "node:fs";
 import { fileURLToPath, URL } from "node:url";
 
 const appVersion = process.env.npm_package_version || "0.0.0";
@@ -8,7 +9,7 @@ const buildTime = new Date().toISOString();
 const appCommit = process.env.GITHUB_SHA || process.env.CF_PAGES_COMMIT_SHA || "development";
 
 export default defineConfig({
-  base: "/",
+  base: "./",
   define: {
     __APP_VERSION__: JSON.stringify(appVersion),
     __APP_BUILD_TIME__: JSON.stringify(buildTime),
@@ -25,6 +26,13 @@ export default defineConfig({
         });
       },
     },
+    {
+      name: "one-transfer-github-pages-history-fallback",
+      closeBundle() {
+        const outputDirectory = fileURLToPath(new URL("./dist/", import.meta.url));
+        copyFileSync(`${outputDirectory}index.html`, `${outputDirectory}404.html`);
+      },
+    },
     basicSsl(),
     VitePWA({
       registerType: "autoUpdate",
@@ -36,7 +44,8 @@ export default defineConfig({
         theme_color: "#f5f5f7",
         background_color: "#f5f5f7",
         display: "standalone",
-        start_url: "/",
+        start_url: "./",
+        scope: "./",
       },
       workbox: {
         clientsClaim: true,

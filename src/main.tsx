@@ -4,6 +4,8 @@ import { BrowserRouter } from "react-router-dom";
 import { App } from "@/app";
 import "@/styles.css";
 
+const routerBasePath = new URL("../", import.meta.url).pathname.replace(/\/$/, "") || "/";
+
 if ("serviceWorker" in navigator) {
   const wasControlled = navigator.serviceWorker.controller !== null;
   let reloading = false;
@@ -15,7 +17,7 @@ if ("serviceWorker" in navigator) {
 }
 
 createRoot(document.getElementById("root")!).render(
-  <BrowserRouter>
+  <BrowserRouter basename={routerBasePath}>
     <App />
   </BrowserRouter>,
 );
