@@ -40,7 +40,6 @@ import {
 } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { SweepShine } from "@/components/ui/sweep-shine";
-import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import {
@@ -429,8 +428,7 @@ function TransferSpeedControl({ compact = false }: { compact?: boolean }) {
     window.dispatchEvent(new CustomEvent<number>(SEND_SPEED_CHANGE_EVENT, { detail: nextIndex }));
   };
 
-  const changeSpeed = ([nextIndex]: number[]) => {
-    if (nextIndex === undefined) return;
+  const selectSpeed = (nextIndex: number) => {
     manuallySelected.current = true;
     applySpeed(nextIndex);
   };
@@ -474,18 +472,28 @@ function TransferSpeedControl({ compact = false }: { compact?: boolean }) {
           {profile.label} · 约 {rawKiBPerSecond} KiB/s
         </output>
       </div>
-      <Slider
-        className={compact ? "app-style-56" : "app-style-57"}
-        value={[index]}
-        min={0}
-        max={SEND_SPEED_PROFILES.length - 1}
-        step={1}
+      <div
+        className={cn("speed-profile-buttons", compact && "is-compact")}
+        role="group"
         aria-label="传输速度"
-        onValueChange={changeSpeed}
-      />
-      <div className={cn("app-style-58", compact ? "app-style-59" : "app-style-60")}>
-        <span>最低</span>
-        <span>最高</span>
+      >
+        {SEND_SPEED_PROFILES.map((option, optionIndex) => {
+          const speed = Math.round(
+            QR_SYMBOLS_PER_TICK * option.txFps * (option.frameBytes - HEADER_LEN) / 1024,
+          );
+          return (
+            <button
+              key={option.label}
+              type="button"
+              className={cn("speed-profile-button", optionIndex === index && "is-active")}
+              aria-pressed={optionIndex === index}
+              onClick={() => selectSpeed(optionIndex)}
+            >
+              <strong>{option.label}</strong>
+              <span>约 {speed} KiB/s</span>
+            </button>
+          );
+        })}
       </div>
       {compact ? (
         <p className="app-style-61" aria-live="polite">{inspection}</p>
