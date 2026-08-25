@@ -1,4 +1,4 @@
-import { isPrecompressedType, MAX_FILE_BYTES, MAX_FILE_LABEL } from "./protocol";
+import { isPrecompressedType } from "./protocol";
 
 export type ClipboardTransferItemType = "file" | "directory";
 export type ClipboardTextCodec = "base91";
@@ -62,8 +62,6 @@ export async function encodeClipboardTransfer(
   mediaType = "application/octet-stream",
 ): Promise<EncodedClipboardTransfer> {
   if (!isValidWindowsFileName(name)) throw new Error("文件名无法在 Windows 中使用。");
-  if (bytes.length > MAX_FILE_BYTES) throw new Error(`文件不能超过 ${MAX_FILE_LABEL}。`);
-
   const [sha256, compressed] = await Promise.all([
     sha256Hex(bytes),
     shouldTryGzip(itemType, mediaType, bytes.length) ? gzip(bytes) : Promise.resolve(undefined),
@@ -106,7 +104,7 @@ export async function decodeClipboardTransfer(text: string): Promise<DecodedClip
   const compression = parts[3];
   if (compression !== "none" && compression !== "gzip") throw new Error("压缩方式不受支持。");
   const originalSize = Number(parts[4]);
-  if (!Number.isSafeInteger(originalSize) || originalSize < 0 || originalSize > MAX_FILE_BYTES) {
+  if (!Number.isSafeInteger(originalSize) || originalSize < 0) {
     throw new Error("原始文件大小无效。");
   }
   const expectedSha256 = parts[5]!.toLowerCase();

@@ -68,7 +68,7 @@ If Cloudflare does not detect the project automatically, use:
 Use this direction when the source side can copy text, the Windows side can paste text, but the channel
 does not carry a file object.
 
-1. Open `#/clipboard` on the source device.
+1. Open `/clipboard` on the source device.
 2. On the Windows receiver, download `one-transfer-restore.bat` once. Put the script in the directory
    where restored files should be written. The complete source is also visible on the page when direct
    download is inconvenient.
@@ -91,19 +91,19 @@ record. Base91 is larger but survives systems that normalize, reject, or re-enco
 | High-density Unicode / Base32768 | Clipboard preserves Unicode; Windows/RDP text path | about 6.67% in UTF-16 |
 | ASCII compatible / Base91 | Channel accepts printable ASCII only or Unicode was changed | about 23% |
 
-The 64 MiB application limit is not a promise that every clipboard channel accepts 64 MiB of text.
-Remote-desktop products, browser implementations, gateways, and policy layers may impose smaller limits.
+The application does not impose a size limit on clipboard files. The practical capacity is determined by
+the browser, remote-desktop product, gateway, and policy layers.
 V2 detects a truncated record; it cannot increase the underlying channel capacity.
 
 ### Transfer a File or Text with Light
 
-1. Open `#/send`, choose **File** or **Text**, and select the content.
+1. Open `/send`, choose **File** or **Text**, and select the content.
 2. One Transfer inspects the sending computer and selects the highest Stable/Balanced/Fast preset it can
    reasonably render. The file limit updates with that preset. Lower the slider if the receiving image is
    small, blurred, compressed, or tearing.
 3. Keep the four animated QR codes visible. The sender progress bar measures one recommended fountain
    broadcast round; it is not a receiver acknowledgement.
-4. On the receiving device, open `#/receive` and choose **Scan computer screen** or **Use camera**.
+4. On the receiving device, open `/receive` and choose **Scan computer screen** or **Use camera**.
 5. Keep the QR grid inside the capture. The receiver accepts distinct symbols in any order and tolerates
    missing or repeated frames. The receiver progress bar is the authoritative recovery state.
 6. Save the file or copy the recovered text only after the page reports successful integrity validation.
@@ -248,7 +248,7 @@ channel is text-only.
 ### 3.1 Stack
 
 - React 19, Vite 6, and TypeScript 5
-- React Router 7 with a persistent `HashRouter` layout
+- React Router 7 with a persistent `BrowserRouter` layout
 - Tailwind CSS 4 and local shadcn/ui components
 - GSAP 3 for loading, route, Tabs, and ambient breathing motion
 - `qrcode` for QR generation
@@ -263,12 +263,12 @@ The application has one HTML entry point:
 
 | Route | Purpose |
 |---|---|
-| `#/` | Channel selection |
-| `#/send` | Display an internal file or text snippet as animated QR frames |
-| `#/receive` | Receive through screen capture or a camera |
-| `#/clipboard` | Encode an inbound file as clipboard text and download the Windows restorer |
+| `/` | Channel selection |
+| `/send` | Display an internal file or text snippet as animated QR frames |
+| `/receive` | Receive through screen capture or a camera |
+| `/clipboard` | Encode an inbound file as clipboard text and download the Windows restorer |
 
-React Router's hash routing requires no server-side rewrite. The parent layout remains mounted while
+React Router's history routing uses the Cloudflare Pages SPA fallback in `public/_redirects`. The parent layout remains mounted while
 each child route mounts exactly one page and its transfer controller. Leaving the send route stops QR
 animation. Leaving the receive route closes camera or screen capture, terminates decoder workers, and
 clears timers before the page unmounts.
@@ -291,7 +291,7 @@ static service.
 
 ### 4.1 Sender Processing
 
-On `#/clipboard`, the external sender:
+On `/clipboard`, the external sender:
 
 1. Validates that the selected filename can be created on Windows.
 2. Reads bytes locally through `File.arrayBuffer()`.
@@ -321,7 +321,7 @@ ONE_TRANSFER_V2|<itemType>|<codec>|<compression>|<originalSize>|<sha256>|<percen
 | `itemType` | `file` or `directory` |
 | `codec` | `b32768` or `base91` |
 | `compression` | `none` or `gzip` |
-| `originalSize` | Exact decoded byte count, bounded to 64 MiB |
+| `originalSize` | Exact decoded byte count |
 | `sha256` | Lowercase SHA-256 of the original bytes |
 | name | Percent-encoded UTF-8 basename |
 | payload | Encoded original bytes, gzip stream, or directory ZIP |
@@ -333,7 +333,7 @@ The web UI handles one file per operation. On a Mac sender, a directory can be p
 
 ### 4.3 Windows Restoration
 
-The Windows receiver can download `one-transfer-restore.bat` from `#/clipboard`, or copy the complete script
+The Windows receiver can download `one-transfer-restore.bat` from `/clipboard`, or copy the complete script
 source displayed on the page and save it under that filename. Place it in the desired destination
 directory. On each run, the script:
 
@@ -448,7 +448,7 @@ The fixed little-endian container header is 49 bytes:
 
 The optical file limit is derived from the active preset's bytes per symbol, the 20-byte frame header,
 and the `u16` source-block count: about 90.2 MiB for Stable, 104.9 MiB for Balanced, and 144.3 MiB for
-Fast. Text snippets remain limited to 4 MiB and clipboard files to 64 MiB. Compressible data is tested
+Fast. Text snippets remain limited to 4 MiB; clipboard files have no application-level size limit. Compressible data is tested
 with gzip, while JPEG, video, ZIP, Office Open XML, and other precompressed types skip the extra
 allocation and CPU pass. Gzip is selected only when it saves more than 64 bytes.
 
@@ -554,7 +554,7 @@ sequenceDiagram
 ## 6. Text Transfer
 
 Inbound ordinary text should use the existing plain-text clipboard directly. Outbound text is entered
-on `#/send`, encoded as UTF-8 in the same container and fountain stream, and reconstructed by the same
+on `/send`, encoded as UTF-8 in the same container and fountain stream, and reconstructed by the same
 receiver. The text limit is 4 MiB. Recovered text is held only in the page and is not persisted.
 
 ---
@@ -658,7 +658,7 @@ final verification.
 one-transfer/
 ├── index.html                 # Minimal Vite entry and critical boot screen
 ├── src/
-│   ├── main.tsx               # React root and HashRouter
+│   ├── main.tsx               # React root and BrowserRouter
 │   ├── app.tsx                # Persistent routes, views, loading, and GSAP
 │   ├── styles.css             # Tailwind entry and dynamic controller styles
 │   ├── components/            # Build info, update checker, and local shadcn/ui

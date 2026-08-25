@@ -218,7 +218,7 @@ function Restore-Transfer([string] $Content) {
         $codec = $parts[2]
         $compression = $parts[3]
         $originalSize = 0L
-        if (-not [Int64]::TryParse($parts[4], [ref]$originalSize) -or $originalSize -lt 0 -or $originalSize -gt 67108864) {
+        if (-not [Int64]::TryParse($parts[4], [ref]$originalSize) -or $originalSize -lt 0) {
             throw '协议声明的原始文件大小无效。'
         }
         $expectedSha256 = $parts[5].ToLowerInvariant()

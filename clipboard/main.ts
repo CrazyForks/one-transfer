@@ -6,7 +6,6 @@ import {
 } from "../shared/clipboard-transfer";
 import { zip } from "fflate";
 import { formatBytes } from "../shared/format";
-import { MAX_FILE_BYTES, MAX_FILE_LABEL } from "../shared/protocol";
 import { statusLine } from "../shared/status-line";
 import { createSourceArchiveInWorker } from "../shared/source-archive-client";
 
@@ -79,11 +78,6 @@ async function prepareFile(): Promise<void> {
     status.showError(`${file.name} 不是有效的 Windows 文件名，请先重命名`);
     return;
   }
-  if (file.size > MAX_FILE_BYTES) {
-    status.showError(`${file.name} 大小为 ${formatBytes(file.size)}，超过 ${MAX_FILE_LABEL} 限制`);
-    return;
-  }
-
   const automaticWrite = beginDeferredClipboardWrite();
   copyButton.textContent = "正在自动复制…";
   status.showLoading(`正在准备 ${file.name}…`);
@@ -159,12 +153,6 @@ async function prepareDirectory(): Promise<void> {
       return;
     }
     const bytes = await createZip(entries);
-    if (bytes.length > MAX_FILE_BYTES) {
-      automaticWrite?.reject(new Error("ZIP 超过传输上限"));
-      status.showError(`${rootName}.zip 大小为 ${formatBytes(bytes.length)}，超过 ${MAX_FILE_LABEL} 限制`);
-      copyButton.textContent = "复制文件夹全部内容到剪贴板";
-      return;
-    }
     selected = {
       itemType: "directory",
       name: rootName,
@@ -200,12 +188,13 @@ async function prepareProjectDirectory(): Promise<void> {
   try {
     const archive = await createSourceArchiveInWorker(
       files,
-      MAX_FILE_BYTES,
+      Number.POSITIVE_INFINITY,
       undefined,
       (progress) => {
         if (currentGeneration !== generation) return;
         status.showLoading(`${progress.message} · ${Math.round(progress.percent)}%`);
       },
+      { maxInputBytes: Number.POSITIVE_INFINITY },
     );
     if (currentGeneration !== generation) {
       automaticWrite?.reject(new Error("工程选择已变更"));

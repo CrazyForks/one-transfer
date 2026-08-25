@@ -67,7 +67,7 @@ pnpm check
 
 适用于源端可以复制文字、Windows 接收端可以粘贴文字，但通道不能直接承载文件对象的情况。
 
-1. 在源设备打开 `#/clipboard`。
+1. 在源设备打开 `/clipboard`。
 2. 在 Windows 接收端首次下载 `one-transfer-restore.bat`，并把脚本放到希望保存文件的目录。
    如果通道不方便直接下载，页面也会显示完整源码，可以复制并保存为同名 BAT。
 3. 默认使用 **ASCII 兼容** Base91，优先适配 Windows、RDP 和可能改写高位 Unicode 的
@@ -88,16 +88,16 @@ pnpm check
 | 高密度 Unicode / Base32768 | 通道完整保留 Unicode；Windows/RDP 文本路径 | UTF-16 下约 6.67% |
 | ASCII 兼容 / Base91 | 只可靠支持可打印 ASCII，或 Unicode 已被修改 | 约 23% |
 
-应用的 64 MiB 上限并不表示所有剪贴板都能承载 64 MiB 文本。远程桌面产品、浏览器、网关与
-安全策略可能设置更小的限制。V2 能发现截断，但不能提高底层通道本身的容量。
+应用不对剪贴板文件设置大小上限。实际可传输容量由浏览器、远程桌面、网关和安全策略决定。
+V2 能发现截断，但不能提高底层通道本身的容量。
 
 ### 通过光传输文件或文字
 
-1. 打开 `#/send`，选择 **文件** 或 **文字**，然后选择或输入内容。
+1. 打开 `/send`，选择 **文件** 或 **文字**，然后选择或输入内容。
 2. One Transfer 会检查发送电脑，并自动选择当前设备能够承担的最高“稳定/平衡/高速”档位。
    文件上限会随档位同步更新；如果接收画面过小、模糊、被压缩或出现撕裂，请手动降低速度。
 3. 保持四个动态二维码完整可见。发送端进度条表示一轮建议喷泉码广播进度，不是接收确认。
-4. 在接收设备打开 `#/receive`，选择 **扫描电脑屏幕** 或 **使用相机**。
+4. 在接收设备打开 `/receive`，选择 **扫描电脑屏幕** 或 **使用相机**。
 5. 让二维码网格完整进入捕获画面。接收端可以乱序收集不同 symbol，并容忍漏帧和重复帧；
    接收端进度条才表示真实恢复状态。
 6. 只有页面完成完整性校验后，才保存文件或复制恢复出的文字。
@@ -241,7 +241,7 @@ flowchart LR
 ### 3.1 技术栈
 
 - React 19、Vite 6 与 TypeScript 5
-- React Router 7 持久化 `HashRouter` Layout
+- React Router 7 持久化 `BrowserRouter` Layout
 - Tailwind CSS 4 与本地 shadcn/ui 组件
 - GSAP 3 加载、路由、Tabs 与页面呼吸动效
 - `qrcode` 生成二维码
@@ -256,12 +256,12 @@ flowchart LR
 
 | 路由 | 功能 |
 |---|---|
-| `#/` | 首页与通道选择 |
-| `#/send` | 发送文件或文字动态二维码 |
-| `#/receive` | 在边界外扫描屏幕或使用相机接收 |
-| `#/clipboard` | 在外部发送端把文件编码成剪贴板文本；在 Windows 端下载还原脚本 |
+| `/` | 首页与通道选择 |
+| `/send` | 发送文件或文字动态二维码 |
+| `/receive` | 在边界外扫描屏幕或使用相机接收 |
+| `/clipboard` | 在外部发送端把文件编码成剪贴板文本；在 Windows 端下载还原脚本 |
 
-React Router 的 Hash 路由不依赖服务器重写规则。父 Layout 持续存在，每个子路由只挂载
+React Router 的 History 路由使用 `public/_redirects` 配置 Cloudflare Pages SPA 回退。父 Layout 持续存在，每个子路由只挂载
 一个页面及其传输控制器；离开发送页会停止二维码动画，离开接收页会在卸载前关闭相机或
 屏幕共享、终止解码 Worker 和统计定时器。
 
@@ -282,7 +282,7 @@ HTML 入口只保留一份内联关键启动屏。React 完成挂载并加载传
 
 ### 4.1 发送端处理
 
-外部发送端在 `#/clipboard` 选择单个文件后执行以下步骤：
+外部发送端在 `/clipboard` 选择单个文件后执行以下步骤：
 
 1. 校验文件名是否能在 Windows 使用，包括非法字符、结尾空格/句点和保留设备名。
 2. 使用 `File.arrayBuffer()` 在浏览器本地读取文件字节。
@@ -310,7 +310,7 @@ ONE_TRANSFER_V2|<itemType>|<codec>|<compression>|<originalSize>|<sha256>|<percen
 | `itemType` | `file` 或 `directory` |
 | `codec` | `b32768` 或 `base91` |
 | `compression` | `none` 或 `gzip` |
-| `originalSize` | 解码后精确字节数，上限 64 MiB |
+| `originalSize` | 解码后精确字节数 |
 | `sha256` | 原始字节的小写 SHA-256 |
 | 文件名 | 百分号编码的 UTF-8 basename |
 | 负载 | 原始字节、gzip 流或目录 ZIP 的文本编码 |
@@ -321,7 +321,7 @@ ONE_TRANSFER_V2|<itemType>|<codec>|<compression>|<originalSize>|<sha256>|<percen
 
 ### 4.3 Windows 还原流程
 
-Windows 接收端首次使用时，可以从 `#/clipboard` 下载 `one-transfer-restore.bat`，也可以复制页面
+Windows 接收端首次使用时，可以从 `/clipboard` 下载 `one-transfer-restore.bat`，也可以复制页面
 中显示的完整脚本源码并保存为同名文件，然后放入目标目录。
 每次接收时双击该脚本：
 
@@ -432,8 +432,8 @@ Base32768 在字符数量和 UTF-16 存储中更小。如果中间服务把文�
 | 49 | 可变 | Name + Type + Payload | 文件名、MIME 和文件内容 |
 
 光学文件上限从当前档位的每码字节数、20 字节帧头和 `u16` 源块数动态计算：
-稳定约 90.2 MiB、平衡约 104.9 MiB、高速约 144.3 MiB。文字上限仍为 4 MiB，剪贴板文件上限仍为
-64 MiB。发送端对可压缩内容尝试 gzip；JPEG、视频、ZIP、Office Open XML 等已经压缩的格式
+稳定约 90.2 MiB、平衡约 104.9 MiB、高速约 144.3 MiB。文字上限仍为 4 MiB，剪贴板文件不设应用级大小上限。
+发送端对可压缩内容尝试 gzip；JPEG、视频、ZIP、Office Open XML 等已经压缩的格式
 直接跳过，以避免额外内存和 CPU 开销。只有压缩结果至少节省 64 字节时才采用 gzip。
 
 接收端解压时不信任 gzip 尾部声明，而是流式累计输出并使用原始长度作为硬上限，避免小型
@@ -519,7 +519,7 @@ sequenceDiagram
   participant Q as 动态二维码流
   participant R as 外部接收端
 
-  W->>W: 在 #/send 选择内部文件或输入文字
+  W->>W: 在 /send 选择内部文件或输入文字
   W->>W: 封装、SHA-256、可选 gzip、LT 编码
   loop 持续播放
     W->>Q: 显示 sessionId + seq + 编码块
@@ -542,7 +542,7 @@ sequenceDiagram
 
 ### 6.2 文字通过光学通道传递
 
-在发送端打开 `#/send` 并切换到“文字”，输入或粘贴内容后开始发送。文字按 UTF-8
+在发送端打开 `/send` 并切换到“文字”，输入或粘贴内容后开始发送。文字按 UTF-8
 封装进与文件相同的容器和喷泉码流，最大 4 MiB。外部接收端识别专用 MIME 类型后直接
 显示原文，并提供复制按钮；页面关闭后不持久化文字内容。
 
@@ -643,7 +643,7 @@ netKiB/s ≈ rawKiB/s × decodeSuccessRate / fountainOverhead
 one-transfer/
 ├── index.html                 # 最小 Vite 入口与关键启动屏
 ├── src/
-│   ├── main.tsx               # React 根节点与 HashRouter
+│   ├── main.tsx               # React 根节点与 BrowserRouter
 │   ├── app.tsx                # 持久路由、页面、loading 与 GSAP
 │   ├── styles.css             # Tailwind 入口与动态控制器样式
 │   ├── components/            # 构建信息、更新检查与本地 shadcn/ui

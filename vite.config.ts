@@ -9,7 +9,7 @@ const buildTime = new Date().toISOString();
 const appCommit = process.env.GITHUB_SHA || process.env.CF_PAGES_COMMIT_SHA || "development";
 
 export default defineConfig({
-  base: "./",
+  base: "/",
   define: {
     __APP_VERSION__: JSON.stringify(appVersion),
     __APP_BUILD_TIME__: JSON.stringify(buildTime),
@@ -38,7 +38,7 @@ export default defineConfig({
         theme_color: "#f5f5f7",
         background_color: "#f5f5f7",
         display: "standalone",
-        start_url: "./#/",
+        start_url: "/",
       },
       workbox: {
         clientsClaim: true,

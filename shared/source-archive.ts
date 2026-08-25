@@ -168,6 +168,7 @@ export interface SourcePathDecision {
 
 export interface SourceArchiveOptions {
   readonly includeGit?: boolean;
+  readonly maxInputBytes?: number;
 }
 
 export interface SourceArchiveWorkProgress {
@@ -263,6 +264,7 @@ export async function createSourceArchive(
   if (files.length === 0) throw new Error("未读取到源码文件夹内容。");
   onProgress({ percent: 2, message: `开始扫描 ${files.length.toLocaleString()} 个目录项` });
 
+  const maxInputBytes = options.maxInputBytes ?? MAX_SOURCE_INPUT_BYTES;
   let rootName = "";
   let excludedFileCount = 0;
   let inputBytes = 0;
@@ -285,7 +287,7 @@ export async function createSourceArchive(
       throw new Error(`过滤后的源码文件超过 ${MAX_SOURCE_FILES.toLocaleString()} 个。`);
     }
     inputBytes += file.size;
-    if (inputBytes > MAX_SOURCE_INPUT_BYTES) {
+    if (inputBytes > maxInputBytes) {
       throw new Error("过滤后的源码文件超过 256 MB，请检查是否仍包含大型生成文件。");
     }
     included.push({ file, path: `${rootName}/${decision.relativePath}` });
