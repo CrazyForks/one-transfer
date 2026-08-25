@@ -1,4 +1,4 @@
-import { isPrecompressedType } from "./protocol";
+import { gzip as compressGzip } from "fflate";
 
 export type ClipboardTransferItemType = "file" | "directory";
 export type ClipboardTextCodec = "base91";
@@ -59,14 +59,14 @@ export async function encodeClipboardTransfer(
   name: string,
   bytes: Uint8Array,
   codec: ClipboardTextCodec = "base91",
-  mediaType = "application/octet-stream",
+  _mediaType = "application/octet-stream",
 ): Promise<EncodedClipboardTransfer> {
   if (!isValidWindowsFileName(name)) throw new Error("文件名无法在 Windows 中使用。");
   const [sha256, compressed] = await Promise.all([
     sha256Hex(bytes),
-    shouldTryGzip(itemType, mediaType, bytes.length) ? gzip(bytes) : Promise.resolve(undefined),
+    gzip(bytes),
   ]);
-  const useGzip = compressed !== undefined && compressed.length + 64 < bytes.length;
+  const useGzip = compressed.length < bytes.length;
   const transmitted = useGzip ? compressed : bytes;
   const compression: ClipboardCompression = useGzip ? "gzip" : "none";
   const payload = encodeBase91(transmitted);
@@ -175,18 +175,13 @@ export function decodeBase91(text: string): Uint8Array {
   return Uint8Array.from(output);
 }
 
-function shouldTryGzip(
-  itemType: ClipboardTransferItemType,
-  mediaType: string,
-  byteLength: number,
-): boolean {
-  return itemType === "file" && byteLength >= 768 && !isPrecompressedType(mediaType);
-}
-
-async function gzip(bytes: Uint8Array): Promise<Uint8Array | undefined> {
-  if (typeof CompressionStream === "undefined") return undefined;
-  const stream = new Blob([bytes as BlobPart]).stream().pipeThrough(new CompressionStream("gzip"));
-  return new Uint8Array(await new Response(stream).arrayBuffer());
+function gzip(bytes: Uint8Array): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => {
+    compressGzip(bytes, { level: 9 }, (error, compressed) => {
+      if (error) reject(error);
+      else resolve(compressed);
+    });
+  });
 }
 
 async function gunzip(bytes: Uint8Array, expectedSize: number): Promise<Uint8Array> {

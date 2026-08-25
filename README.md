@@ -295,7 +295,7 @@ On `/clipboard`, the external sender:
 
 1. Validates that the selected filename can be created on Windows.
 2. Reads bytes locally through `File.arrayBuffer()`.
-3. Computes SHA-256 and tries gzip for data that is not already compressed.
+3. Computes SHA-256 and tries maximum-level gzip for every selected payload.
 4. Encodes the transmitted bytes as Base32768 by default, or Base91 in ASCII compatibility mode.
 5. Constructs `ONE_TRANSFER_V2` and writes the text to the clipboard without rendering the payload.
 6. Uses a temporary text area with `execCommand` when the modern Clipboard API is unavailable.
@@ -380,17 +380,15 @@ original bytes
             └─ ONE_TRANSFER_V2 header + encoded payload
 ```
 
-The web sender considers gzip only when the item is a file, its size is at least 768 bytes, and its MIME
-type is not known to be already compressed. Even then, gzip is accepted only when:
+The web sender tries maximum-level gzip for every file and folder ZIP. To keep the transmitted payload
+as small as possible, gzip is accepted only when:
 
 ```text
-gzipSize + 64 < originalSize
+gzipSize < originalSize
 ```
 
-The 64-byte margin prevents spending decoder work and protocol complexity for a negligible result.
-Video, ZIP/gzip/7z/RAR/xz/zstd, most JPEG/PNG/WebP-style images, compressed audio, Office Open XML, and
-OpenDocument files skip the trial. BMP, SVG, TIFF, WAV, AIFF, plain text, JSON, source code, CSV, XML,
-and logs remain eligible. The Mac helper calculates gzip and makes the same 64-byte gain decision.
+Already-compressed video, archives, images, audio, and Office files are still tested. If gzip makes the
+payload larger, the sender automatically keeps the smaller original bytes.
 
 Let `N` be original bytes, `C` the selected transmitted bytes after optional gzip, and `H` the V2 header
 and encoded filename character count. Approximate text lengths are:
@@ -409,13 +407,13 @@ limit and behavior, not only the string length shown by the browser.
 To minimize the transferred text:
 
 1. Use **High-density Unicode** unless the real channel changes Unicode or is explicitly ASCII-only.
-2. Let One Transfer gzip text-like files automatically; pre-zipping one ordinary text file is usually
-   unnecessary and removes MIME information that helps the UI explain the decision.
-3. Do not repeatedly recompress JPEG, PNG, WebP, MP4, ZIP, 7z, RAR, Office, or other entropy-coded files.
-   They normally cannot shrink further; Base32768 still reduces the text-encoding overhead.
+2. Let One Transfer try maximum-level gzip and automatically select the smaller representation.
+3. JPEG, PNG, WebP, MP4, ZIP, 7z, RAR, Office, and other compressed files are also tested; no manual
+   preprocessing is required.
 4. Remove generated caches, build output, debug logs, or other unnecessary content before creating an
    archive. Compression cannot remove data that is not needed in the first place.
-5. For a directory, use the Mac helper to create one ZIP rather than transferring many files separately.
+5. For a directory, use the web UI's **Complete folder** or **Frontend / Python project** entry; the UI
+   creates one maximum-level ZIP.
 6. If the concrete clipboard limit is below the final V2 character count, split the source into smaller
    files before encoding. V2 currently restores one complete record and does not implement multipart state.
 
@@ -448,9 +446,8 @@ The fixed little-endian container header is 49 bytes:
 
 The optical file limit is derived from the active preset's bytes per symbol, the 20-byte frame header,
 and the `u16` source-block count: about 90.2 MiB for Stable, 104.9 MiB for Balanced, and 144.3 MiB for
-Fast. Text snippets remain limited to 4 MiB; clipboard files have no application-level size limit. Compressible data is tested
-with gzip, while JPEG, video, ZIP, Office Open XML, and other precompressed types skip the extra
-allocation and CPU pass. Gzip is selected only when it saves more than 64 bytes.
+Fast. Text snippets remain limited to 4 MiB; clipboard files have no application-level size limit. Every clipboard
+payload is tested with maximum-level gzip, and the sender transmits whichever representation is smaller.
 
 The receiver streams decompression and enforces the declared original length as a hard output ceiling;
 it does not trust the gzip trailer as a safe allocation bound.
@@ -670,8 +667,10 @@ one-transfer/
 │   ├── worker.ts              # ZXing WASM decode worker
 │   ├── worker-factory.ts      # Worker construction
 │   └── wasm-url.ts            # Decoder WASM asset URL
-├── clipboard/main.ts          # Browser file-to-text clipboard sender
+├── clipboard/main.ts          # Clipboard selection, status, and copy controller
 ├── shared/                    # Protocols, fountain code, validation, utilities
+│   ├── clipboard-processing.worker.ts # Directory ZIP, gzip, SHA-256, and Base91
+│   └── clipboard-processing-client.ts # Clipboard Worker lifecycle and cancellation
 ├── public/                    # Windows receiver and update-check Worker
 ├── .github/workflows/         # GitHub Pages and Cloudflare Pages deployment
 ├── tests/                     # Golden vectors and unit tests
@@ -690,7 +689,7 @@ the `ONE_TRANSFER_V2` Base32768/Base91 protocol with the browser implementation.
 
 - Node.js 24+
 - pnpm 10
-- A modern browser with WebAssembly, Media Capture, and Web Worker support
+- A modern browser with Web Worker support; receiving also requires WebAssembly and Media Capture
 - Windows PowerShell with `Get-Clipboard` on the inbound receiver
 
 ### 10.2 Commands

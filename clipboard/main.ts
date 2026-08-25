@@ -1,10 +1,12 @@
 import {
-  encodeClipboardTransfer,
   isValidWindowsFileName,
   type ClipboardTextCodec,
   type EncodedClipboardTransfer,
 } from "../shared/clipboard-transfer";
-import { zip } from "fflate";
+import {
+  createClipboardDirectoryArchiveInWorker,
+  encodeClipboardTransferInWorker,
+} from "../shared/clipboard-processing-client";
 import { formatBytes } from "../shared/format";
 import { statusLine } from "../shared/status-line";
 import { createSourceArchiveInWorker } from "../shared/source-archive-client";
@@ -27,6 +29,7 @@ document.body.append(toast);
 let payload: string | null = null;
 let selectedName = "";
 let generation = 0;
+let processingAbortController: AbortController | null = null;
 let selected: {
   itemType: "file" | "directory";
   name: string;
@@ -46,6 +49,12 @@ function currentCodec(): ClipboardTextCodec {
   return "base91";
 }
 
+function beginProcessing(): { currentGeneration: number; signal: AbortSignal } {
+  processingAbortController?.abort();
+  processingAbortController = new AbortController();
+  return { currentGeneration: ++generation, signal: processingAbortController.signal };
+}
+
 function showToast(message: string, tone: "success" | "error"): void {
   clearTimeout(toastTimer);
   toast.textContent = message;
@@ -59,7 +68,7 @@ function showToast(message: string, tone: "success" | "error"): void {
 
 async function prepareFile(): Promise<void> {
   const file = fileInput.files?.[0];
-  const currentGeneration = ++generation;
+  const { currentGeneration, signal } = beginProcessing();
   payload = null;
   selectedName = "";
   selected = null;
@@ -94,7 +103,7 @@ async function prepareFile(): Promise<void> {
       mediaType: file.type,
       detail: formatBytes(file.size),
     };
-    await encodeSelected(currentGeneration, automaticWrite);
+    await encodeSelected(currentGeneration, automaticWrite, signal);
   } catch (error) {
     automaticWrite?.reject(error);
     if (currentGeneration !== generation) return;
@@ -104,7 +113,7 @@ async function prepareFile(): Promise<void> {
 
 async function prepareDirectory(): Promise<void> {
   const files = [...(directoryInput.files ?? [])];
-  const currentGeneration = ++generation;
+  const { currentGeneration, signal } = beginProcessing();
   payload = null;
   selectedName = "";
   selected = null;
@@ -144,15 +153,10 @@ async function prepareDirectory(): Promise<void> {
   copyButton.textContent = "正在复制文件夹全部内容…";
   status.showLoading(`正在读取 ${rootName} 的全部文件并打包为 ZIP…`);
   try {
-    const entries: Record<string, Uint8Array> = Object.create(null);
-    await Promise.all(files.map(async (file, index) => {
-      entries[paths[index]!] = new Uint8Array(await file.arrayBuffer());
-    }));
-    if (currentGeneration !== generation) {
-      automaticWrite?.reject(new Error("文件夹选择已变更"));
-      return;
-    }
-    const bytes = await createZip(entries);
+    const bytes = await createClipboardDirectoryArchiveInWorker(
+      files.map((file, index) => ({ path: paths[index]!, blob: file })),
+      signal,
+    );
     selected = {
       itemType: "directory",
       name: rootName,
@@ -160,7 +164,7 @@ async function prepareDirectory(): Promise<void> {
       mediaType: "application/zip",
       detail: `${files.length.toLocaleString()} 个文件 → ZIP ${formatBytes(bytes.length)}`,
     };
-    await encodeSelected(currentGeneration, automaticWrite);
+    await encodeSelected(currentGeneration, automaticWrite, signal);
   } catch (error) {
     automaticWrite?.reject(error);
     if (currentGeneration !== generation) return;
@@ -171,7 +175,7 @@ async function prepareDirectory(): Promise<void> {
 
 async function prepareProjectDirectory(): Promise<void> {
   const files = [...(projectDirectoryInput.files ?? [])];
-  const currentGeneration = ++generation;
+  const { currentGeneration, signal } = beginProcessing();
   payload = null;
   selectedName = "";
   selected = null;
@@ -189,7 +193,7 @@ async function prepareProjectDirectory(): Promise<void> {
     const archive = await createSourceArchiveInWorker(
       files,
       Number.POSITIVE_INFINITY,
-      undefined,
+      signal,
       (progress) => {
         if (currentGeneration !== generation) return;
         status.showLoading(`${progress.message} · ${Math.round(progress.percent)}%`);
@@ -210,7 +214,7 @@ async function prepareProjectDirectory(): Promise<void> {
       mediaType: "application/zip",
       detail: `工程源码 · ZIP ${formatBytes(archive.bytes.length)}`,
     };
-    await encodeSelected(currentGeneration, automaticWrite);
+    await encodeSelected(currentGeneration, automaticWrite, signal);
   } catch (error) {
     automaticWrite?.reject(error);
     if (currentGeneration !== generation) return;
@@ -219,38 +223,32 @@ async function prepareProjectDirectory(): Promise<void> {
   }
 }
 
-function createZip(entries: Record<string, Uint8Array>): Promise<Uint8Array> {
-  return new Promise((resolve, reject) => {
-    zip(entries, { level: 6 }, (error, data) => {
-      if (error) reject(error);
-      else resolve(data);
-    });
-  });
-}
-
 async function encodeSelected(
   expectedGeneration: number,
   automaticWrite: DeferredClipboardWrite | null,
+  signal: AbortSignal,
 ): Promise<void> {
   if (!selected) return;
   const item = selected;
   payload = null;
   copyButton.disabled = true;
   const codec = currentCodec();
-  status.showLoading(`正在使用 Base91 编码 ${item.name}…`);
+  status.showLoading(`正在 Worker 中使用最高级别压缩并编码 ${item.name}…`);
+  const originalSize = item.bytes.length;
   try {
-    const encoded = await encodeClipboardTransfer(
+    const encoded = await encodeClipboardTransferInWorker(
       item.itemType,
       item.name,
       item.bytes,
       codec,
       item.mediaType,
+      signal,
     );
     if (expectedGeneration !== generation) {
       automaticWrite?.reject(new Error("编码设置已变更"));
       return;
     }
-    applyEncodedItem(item, encoded);
+    applyEncodedItem(item, encoded, originalSize);
     automaticWrite?.resolve(encoded.text);
     await copyTransfer(true, expectedGeneration, automaticWrite?.result);
   } catch (error) {
@@ -263,6 +261,7 @@ async function encodeSelected(
 function applyEncodedItem(
   item: NonNullable<typeof selected>,
   encoded: EncodedClipboardTransfer,
+  originalSize: number,
 ): void {
   payload = encoded.text;
   selectedName = item.name;
@@ -270,7 +269,7 @@ function applyEncodedItem(
   const legacyCharacters =
     25 +
     4 * Math.ceil(new TextEncoder().encode(item.name).length / 3) +
-    4 * Math.ceil(item.bytes.length / 3);
+    4 * Math.ceil(originalSize / 3);
   const saving = Math.round((1 - encoded.encodedCharacters / Math.max(1, legacyCharacters)) * 100);
   const compression = encoded.compression === "gzip"
     ? `${formatBytes(encoded.originalSize)} → gzip ${formatBytes(encoded.transmittedSize)}`
@@ -380,6 +379,8 @@ directoryInput.addEventListener("change", () => void prepareDirectory());
 projectDirectoryInput.addEventListener("change", () => void prepareProjectDirectory());
 copyButton.addEventListener("click", () => void copyTransfer());
 return () => {
+  processingAbortController?.abort();
+  processingAbortController = null;
   generation++;
   clearTimeout(toastTimer);
   toast.remove();

@@ -72,7 +72,7 @@ pnpm check
    如果通道不方便直接下载，页面也会显示完整源码，可以复制并保存为同名 BAT。
 3. 默认使用 **ASCII 兼容** Base91，优先适配 Windows、RDP 和可能改写高位 Unicode 的
    受限剪贴板通道；确认通道完整保留 Unicode 时，可切换 **高密度 Unicode** 减少字符数。
-4. 选择文件。浏览器只在本地读取文件，计算 SHA-256，按条件尝试 gzip，并显示原始大小、
+4. 选择文件。浏览器只在本地读取文件，计算 SHA-256，对所有内容尝试最高级别 gzip，并显示原始大小、
    gzip 后大小、最终字符数以及相对 V1 Base64 的预计节省比例。
 5. 点击 **复制文件数据到剪贴板**，切换到 Windows 会话，等待远程剪贴板完成同步。
 6. 双击 `one-transfer-restore.bat`。脚本只有在协议、文件名、解码长度、gzip 上限和 SHA-256
@@ -368,17 +368,14 @@ sequenceDiagram
             └─ ONE_TRANSFER_V2 头 + 编码负载
 ```
 
-网页发送端只有在内容是文件、大小至少 768 字节，并且 MIME 类型不属于已压缩格式时，才会
-尝试 gzip。即使完成压缩，也只有满足以下条件才采用：
+网页发送端对所有文件和文件夹 ZIP 都尝试最高级别 gzip。为保证最终传输内容尽可能小，
+只在 gzip 结果小于原始字节时采用：
 
 ```text
-gzipSize + 64 < originalSize
+gzipSize < originalSize
 ```
 
-预留 64 字节收益门槛，是为了避免只节省极少空间却增加接收端解压工作。视频、ZIP/gzip/
-7z/RAR/xz/zstd、大多数 JPEG/PNG/WebP 类图片、压缩音频、Office Open XML 和 OpenDocument
-会直接跳过。BMP、SVG、TIFF、WAV、AIFF、普通文本、JSON、源码、CSV、XML 和日志仍会尝试。
-Mac 辅助脚本会实际执行 gzip，再使用相同的 64 字节收益条件决定是否采用。
+已压缩的视频、ZIP、图片、音频和 Office 文件也会实际尝试；如果 gzip 反而更大，则自动保留较小的原始数据。
 
 设原始字节数为 `N`，可选 gzip 后实际传输字节数为 `C`，V2 协议头和编码文件名字符数为
 `H`，则最终文本长度可近似表示为：
@@ -396,13 +393,11 @@ Base32768 在字符数量和 UTF-16 存储中更小。如果中间服务把文�
 减小传输文本体积时建议：
 
 1. 除非通道会修改 Unicode 或明确只允许 ASCII，否则优先使用 **高密度 Unicode**。
-2. 文本类文件交给 One Transfer 自动 gzip 即可；单独把一个普通文本预先打成 ZIP 通常没有
-   必要，也会丢失页面用于解释压缩策略的 MIME 信息。
-3. 不要反复压缩 JPEG、PNG、WebP、MP4、ZIP、7z、RAR、Office 等熵编码文件。它们通常不会
-   继续变小，但 Base32768 仍能降低二进制转文本开销。
+2. 文件交给 One Transfer 即可；页面会统一尝试最高级别 gzip，并自动选择体积更小的表示。
+3. JPEG、PNG、WebP、MP4、ZIP、7z、RAR、Office 等已压缩文件也会参与试压，无需手动预处理。
 4. 创建目录归档前先删除缓存、构建产物、无用调试日志等不需要传递的内容。压缩无法替代
    对无用数据的清理。
-5. 目录使用 Mac 辅助脚本生成单一 ZIP，比逐个文件分别传输更方便。
+5. 目录直接使用页面的“完整文件夹”或“前端 / Python 工程”入口，页面会以最高级别生成单一 ZIP。
 6. 如果具体剪贴板上限小于最终 V2 字符数，请先把源文件拆成较小文件再分别编码。V2 当前
    一次还原一条完整记录，不维护多段传输状态。
 
@@ -655,8 +650,10 @@ one-transfer/
 │   ├── worker.ts              # ZXing WASM 解码 Worker
 │   ├── worker-factory.ts      # Worker 创建
 │   └── wasm-url.ts            # WASM 静态资源 URL
-├── clipboard/main.ts          # 浏览器文件转文本剪贴板
+├── clipboard/main.ts          # 剪贴板选择、状态和复制控制
 ├── shared/                    # 协议、喷泉码、校验、格式化与通用逻辑
+│   ├── clipboard-processing.worker.ts # 目录 ZIP、gzip、SHA-256 与 Base91
+│   └── clipboard-processing-client.ts # 剪贴板 Worker 生命周期与取消
 ├── public/                    # Windows 还原脚本与更新检查 Worker
 ├── .github/workflows/         # GitHub Pages 与 Cloudflare Pages 部署
 ├── tests/                     # 协议黄金向量和单元测试
@@ -675,7 +672,7 @@ one-transfer/
 
 - Node.js 24 或更高版本
 - pnpm 10
-- 现代浏览器；接收端需要 WebAssembly、Media Capture 和 Web Worker
+- 现代浏览器；剪贴板压缩需要 Web Worker，接收端还需要 WebAssembly 和 Media Capture
 - Windows 接收端需要 Windows PowerShell 与 `Get-Clipboard`
 
 ### 10.2 常用命令
