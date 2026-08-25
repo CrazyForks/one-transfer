@@ -2,6 +2,7 @@ import {
   createSourceArchive,
   type BrowserSourceFile,
   type SourceArchive,
+  type SourceArchiveOptions,
   type SourceArchiveWorkProgress,
 } from "./source-archive";
 
@@ -15,14 +16,15 @@ export function createSourceArchiveInWorker(
   maxArchiveBytes: number,
   signal?: AbortSignal,
   onProgress: (progress: SourceArchiveWorkProgress) => void = () => undefined,
+  options: SourceArchiveOptions = {},
 ): Promise<SourceArchive> {
-  if (typeof Worker === "undefined") return createSourceArchive(files, maxArchiveBytes, onProgress);
+  if (typeof Worker === "undefined") return createSourceArchive(files, maxArchiveBytes, onProgress, options);
 
   let worker: Worker;
   try {
     worker = new Worker(new URL("./source-archive.worker.ts", import.meta.url), { type: "module" });
   } catch {
-    return createSourceArchive(files, maxArchiveBytes, onProgress);
+    return createSourceArchive(files, maxArchiveBytes, onProgress, options);
   }
 
   return new Promise((resolve, reject) => {
@@ -61,6 +63,7 @@ export function createSourceArchiveInWorker(
         relativePath: file.webkitRelativePath,
       })),
       maxArchiveBytes,
+      options,
     });
   });
 }

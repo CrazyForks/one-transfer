@@ -166,6 +166,10 @@ export interface SourcePathDecision {
   readonly rootName: string;
 }
 
+export interface SourceArchiveOptions {
+  readonly includeGit?: boolean;
+}
+
 export interface SourceArchiveWorkProgress {
   readonly percent: number;
   readonly message: string;
@@ -209,13 +213,20 @@ function normalizeSelectedPath(path: string): string[] {
   return segments;
 }
 
-export function decideSourcePath(path: string): SourcePathDecision {
+export function decideSourcePath(path: string, options: SourceArchiveOptions = {}): SourcePathDecision {
   const segments = normalizeSelectedPath(path);
   const rootName = segments[0]!;
   if (!isValidWindowsFileName(rootName)) throw new Error("源码文件夹名称无法在 Windows 中使用。");
 
   const relativeSegments = segments.slice(1);
   const relativePath = relativeSegments.join("/");
+  const isGitMetadata = relativeSegments[0]?.toLowerCase() === ".git";
+  if (isGitMetadata && options.includeGit) {
+    if (relativeSegments.some((segment) => !isValidWindowsFileName(segment))) {
+      throw new Error(`Git元数据包含无法在 Windows 中解压的路径：${relativePath}`);
+    }
+    return { include: true, relativePath, rootName };
+  }
   const lowerDirectories = relativeSegments.slice(0, -1).map((segment) => segment.toLowerCase());
   if (lowerDirectories.some((segment) => EXCLUDED_DIRECTORIES.has(segment))) {
     return { include: false, relativePath, rootName };
@@ -247,6 +258,7 @@ export async function createSourceArchive(
   files: readonly BrowserSourceFile[],
   maxArchiveBytes: number,
   onProgress: (progress: SourceArchiveWorkProgress) => void = () => undefined,
+  options: SourceArchiveOptions = {},
 ): Promise<SourceArchive> {
   if (files.length === 0) throw new Error("未读取到源码文件夹内容。");
   onProgress({ percent: 2, message: `开始扫描 ${files.length.toLocaleString()} 个目录项` });
@@ -259,7 +271,7 @@ export async function createSourceArchive(
 
   for (let index = 0; index < files.length; index++) {
     const file = files[index]!;
-    const decision = decideSourcePath(file.webkitRelativePath);
+    const decision = decideSourcePath(file.webkitRelativePath, options);
     if (rootName && decision.rootName !== rootName) {
       throw new Error("一次只能选择一个源码文件夹。");
     }

@@ -12,7 +12,11 @@
 //   handles erasures, and a frame is either decoded whole or discarded.
 
 import QRCode from "qrcode";
-import { fitQrDisplaySize, integerQrGridLayout } from "../shared/display";
+import {
+  canFitQrGridAtIntegerPixels,
+  fitQrDisplayArea,
+  integerQrGridLayout,
+} from "../shared/display";
 import { rasterizeQr } from "../shared/qr-raster";
 import { formatBytes } from "../shared/format";
 import {
@@ -39,11 +43,15 @@ import {
   QR_GRID_CELLS,
   QR_SYMBOLS_PER_TICK,
   SEND_SPEED_CHANGE_EVENT,
+  SEND_SPEED_SYNC_EVENT,
   SEND_SPEED_PROFILES,
 } from "../shared/send-settings";
 import { createSourceArchiveInWorker } from "../shared/source-archive-client";
 import {
   SOURCE_ARCHIVE_PROGRESS_EVENT,
+  SOURCE_ARCHIVE_OPTIONS_EVENT,
+  SOURCE_ARCHIVE_SEND_EVENT,
+  type SourceArchiveOptionsDetail,
   type SourceArchiveProgressDetail,
 } from "../shared/source-archive-events";
 
@@ -54,6 +62,7 @@ export function mountSend() {
 const qrGrid = document.getElementById("qr-grid") as HTMLDivElement;
 const canvases = [...qrGrid.querySelectorAll<HTMLCanvasElement>("[data-qr-symbol]")];
 const stage = document.getElementById("stage") as HTMLDivElement;
+const qrDisplayArea = document.getElementById("qr-display-area") as HTMLDivElement;
 const specs = document.getElementById("specs")!;
 const cfgFile = document.getElementById("cfg-file") as HTMLInputElement;
 const cfgSourceDirectory = document.getElementById("cfg-source-directory") as HTMLInputElement;
@@ -76,9 +85,15 @@ let selectedFile: {
   transmittedSize: number;
 } | null = null;
 let sourceArchiveAbortController: AbortController | null = null;
+let sourceArchiveDownloadUrl: string | null = null;
+let sourceArchiveOptions: SourceArchiveOptionsDetail = { includeGit: false };
 let generation = 0; // bumped on every restart; stale loops see it and die
 let resizeDisplay: (() => void) | null = null;
 let stopStream: (() => void) | null = null;
+const qrResizeObserver = typeof ResizeObserver === "undefined"
+  ? null
+  : new ResizeObserver(() => resizeDisplay?.());
+qrResizeObserver?.observe(qrDisplayArea);
 const initialSpeedProfileIndex = Number(cfgSpeed.dataset.speedIndex);
 let speedProfileIndex = SEND_SPEED_PROFILES[initialSpeedProfileIndex]
   ? initialSpeedProfileIndex
@@ -115,9 +130,19 @@ function cancelSourceArchive(): void {
   reportSourceArchive({ state: "idle", percent: 0, message: "" });
 }
 
+function revokeSourceArchiveDownload(): void {
+  if (!sourceArchiveDownloadUrl) return;
+  URL.revokeObjectURL(sourceArchiveDownloadUrl);
+  sourceArchiveDownloadUrl = null;
+}
+
 function reportSourceArchive(detail: SourceArchiveProgressDetail): void {
   window.dispatchEvent(new CustomEvent<SourceArchiveProgressDetail>(SOURCE_ARCHIVE_PROGRESS_EVENT, { detail }));
 }
+
+const onSourceArchiveOptions = (event: Event) => {
+  sourceArchiveOptions = (event as CustomEvent<SourceArchiveOptionsDetail>).detail;
+};
 
 function reportSendProgress(detail: SendProgressDetail) {
   window.dispatchEvent(new CustomEvent<SendProgressDetail>(SEND_PROGRESS_EVENT, { detail }));
@@ -143,6 +168,7 @@ function currentMode(): "file" | "snippet" {
 /** Switching what we're sending kills any stream in flight and clears the stage. */
 function applyMode(): void {
   cancelSourceArchive();
+  revokeSourceArchiveDownload();
   invalidateStream();
   selectedFile = null;
   stage.hidden = true;
@@ -169,6 +195,7 @@ function applyMode(): void {
 async function startSelection(
   status: string,
   prepare: () => Promise<{ name: string; size: number; packed: PackedOpticalFile }>,
+  autoStart = true,
 ): Promise<void> {
   const selectionGeneration = invalidateStream();
   selectedFile = null;
@@ -187,7 +214,8 @@ async function startSelection(
     // Wake Lock is best-effort. Some browsers leave the permission request
     // pending, so it must never hold the first QR batch behind that promise.
     void requestScreenWakeLock();
-    await startStream(true);
+    if (autoStart) await startStream(true);
+    else setStatus(`${name} · ${formatBytes(size)} · 已准备完成，可下载或使用二维码发送`);
   } catch (error) {
     if (selectionGeneration !== generation) return;
     showError(error instanceof Error ? error.message : String(error));
@@ -196,6 +224,7 @@ async function startSelection(
 
 async function selectFile(): Promise<void> {
   cancelSourceArchive();
+  revokeSourceArchiveDownload();
   const file = cfgFile.files?.[0];
   if (!file) return;
   fileNameLabel.textContent = file.name;
@@ -225,6 +254,7 @@ async function selectFile(): Promise<void> {
 
 async function selectSourceDirectory(): Promise<void> {
   cancelSourceArchive();
+  revokeSourceArchiveDownload();
   const files = [...(cfgSourceDirectory.files ?? [])];
   if (files.length === 0) return;
   const abortController = new AbortController();
@@ -245,18 +275,21 @@ async function selectSourceDirectory(): Promise<void> {
             progressPercent = progress.percent;
             reportSourceArchive({ state: "running", ...progress });
           },
+          sourceArchiveOptions,
         );
         fileNameLabel.textContent =
           `${archive.name} · ${formatBytes(archive.inputBytes)} → ZIP ${formatBytes(archive.bytes.length)}` +
           ` · 保留 ${archive.includedFileCount.toLocaleString()} 个` +
           ` · 排除 ${archive.excludedFileCount.toLocaleString()} 个`;
         const packed = await packFile(archive.name, "application/zip", archive.bytes, maxFileBytes);
+        sourceArchiveDownloadUrl = URL.createObjectURL(new Blob([archive.bytes as BlobPart], { type: "application/zip" }));
         reportSourceArchive({
           state: "success",
           percent: 100,
           message: `发送文件已准备完成：${archive.name} · ${formatBytes(archive.bytes.length)}`,
           archiveName: archive.name,
           archiveBytes: archive.bytes.length,
+          downloadUrl: sourceArchiveDownloadUrl,
         });
         return {
           name: archive.name,
@@ -275,7 +308,7 @@ async function selectSourceDirectory(): Promise<void> {
         }
         throw error;
       }
-    });
+    }, false);
   } finally {
     if (sourceArchiveAbortController === abortController) sourceArchiveAbortController = null;
   }
@@ -283,6 +316,7 @@ async function selectSourceDirectory(): Promise<void> {
 
 async function selectSnippet(): Promise<void> {
   cancelSourceArchive();
+  revokeSourceArchiveDownload();
   await startSelection("正在准备文字…", async () => {
     const packed = await packSnippet(snippetText.value);
     return { name: "文字", size: packed.originalSize, packed };
@@ -316,6 +350,8 @@ async function main() {
   applyMode();
   window.addEventListener("resize", onResize);
   window.addEventListener(SEND_SPEED_CHANGE_EVENT, onSpeedChange);
+  window.addEventListener(SOURCE_ARCHIVE_OPTIONS_EVENT, onSourceArchiveOptions);
+  window.addEventListener(SOURCE_ARCHIVE_SEND_EVENT, onSourceArchiveSend);
 }
 
 const onResize = () => resizeDisplay?.();
@@ -326,6 +362,10 @@ const onSpeedChange = (event: Event) => {
   }
   updateFileLimitLabel();
   void startStream();
+};
+
+const onSourceArchiveSend = () => {
+  void startStream(true);
 };
 
 /** Only on a fresh pick — a settings change restarts the stream too, and
@@ -351,7 +391,6 @@ async function startStream(revealStage = false) {
   const txFps = speedProfile.txFps;
   const frameBytes = speedProfile.frameBytes;
   const ecc = "L" as const;
-  const displayPx = 1200;
 
   const sessionId = (Math.floor(Math.random() * 0xffff) + 1) & 0xffff;
   const blockLen = blockLength(frameBytes);
@@ -393,33 +432,50 @@ async function startStream(revealStage = false) {
   const visibleFrames: (ImageData | null)[] = canvases.map(() => null);
   const queue: ImageData[] = [];
   let nextSeq = 0;
+  let layoutRestartScheduled = false;
   stage.hidden = false;
 
   const sizeCanvas = () => {
     const dpr = window.devicePixelRatio || 1;
     const total = modules + 2 * MARGIN;
-    const parent = stage.parentElement;
-    const parentStyle = parent ? getComputedStyle(parent) : null;
-    const containerWidth = parent
-      ? parent.clientWidth -
-        Number.parseFloat(parentStyle?.paddingLeft || "0") -
-        Number.parseFloat(parentStyle?.paddingRight || "0")
-      : window.innerWidth;
+    const areaStyle = getComputedStyle(qrDisplayArea);
+    const horizontalAreaChrome =
+      Number.parseFloat(areaStyle.paddingLeft) +
+      Number.parseFloat(areaStyle.paddingRight) +
+      Number.parseFloat(areaStyle.borderLeftWidth) +
+      Number.parseFloat(areaStyle.borderRightWidth);
+    const verticalAreaChrome =
+      Number.parseFloat(areaStyle.paddingTop) +
+      Number.parseFloat(areaStyle.paddingBottom) +
+      Number.parseFloat(areaStyle.borderTopWidth) +
+      Number.parseFloat(areaStyle.borderBottomWidth);
     const stageStyle = getComputedStyle(stage);
     const horizontalChrome =
       Number.parseFloat(stageStyle.paddingLeft) +
       Number.parseFloat(stageStyle.paddingRight) +
       Number.parseFloat(stageStyle.borderLeftWidth) +
       Number.parseFloat(stageStyle.borderRightWidth);
-    const gridBudget = fitQrDisplaySize(
-      window.innerWidth,
-      window.innerHeight,
-      containerWidth,
-      displayPx,
-      horizontalChrome,
+    const gridBudget = fitQrDisplayArea(
+      qrDisplayArea.clientWidth,
+      qrDisplayArea.clientHeight,
+      horizontalAreaChrome + horizontalChrome,
+      verticalAreaChrome,
     );
+    if (gridBudget <= 0) return;
     const gridStyle = getComputedStyle(qrGrid);
     const gap = Number.parseFloat(gridStyle.columnGap) || 0;
+    if (!canFitQrGridAtIntegerPixels(total, gridBudget, gap, dpr) && speedProfileIndex > 0 && !layoutRestartScheduled) {
+      const nextIndex = speedProfileIndex - 1;
+      const nextProfile = SEND_SPEED_PROFILES[nextIndex]!;
+      if (fitsInOneStream(payload.length, nextProfile.frameBytes)) {
+        layoutRestartScheduled = true;
+        speedProfileIndex = nextIndex;
+        window.dispatchEvent(new CustomEvent<number>(SEND_SPEED_SYNC_EVENT, { detail: nextIndex }));
+        setStatus(`当前画面较窄，已自动降到“${nextProfile.label}”以完整显示四个二维码`);
+        window.setTimeout(() => void startStream(true), 0);
+        return;
+      }
+    }
     const layout = integerQrGridLayout(total, gridBudget, gap, dpr);
     scale = layout.modulePixels;
     staging.width = total;
@@ -460,6 +516,7 @@ async function startStream(revealStage = false) {
       modules = qr.modules.size;
       sizeCanvas();
       resizeDisplay = sizeCanvas;
+      requestAnimationFrame(() => requestAnimationFrame(sizeCanvas));
       // Scroll only now: before sizeCanvas() the canvas is still 16×16, so the
       // scroll target would be the wrong height.
       if (revealStage) scrollStageIntoView();
@@ -566,5 +623,9 @@ return () => {
   invalidateStream();
   window.removeEventListener("resize", onResize);
   window.removeEventListener(SEND_SPEED_CHANGE_EVENT, onSpeedChange);
+  window.removeEventListener(SOURCE_ARCHIVE_OPTIONS_EVENT, onSourceArchiveOptions);
+  window.removeEventListener(SOURCE_ARCHIVE_SEND_EVENT, onSourceArchiveSend);
+  qrResizeObserver?.disconnect();
+  revokeSourceArchiveDownload();
 };
 }

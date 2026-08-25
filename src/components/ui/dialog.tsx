@@ -21,13 +21,21 @@ function DialogOverlay({ className, ...props }: React.ComponentProps<typeof Dial
   );
 }
 
-function DialogContent({ className, children, ...props }: React.ComponentProps<typeof DialogPrimitive.Content>) {
+function DialogContent({
+  className,
+  children,
+  persistent = false,
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Content> & { persistent?: boolean }) {
   return (
-    <DialogPortal>
-      <DialogOverlay />
+    <DialogPortal forceMount={persistent || undefined}>
+      <DialogOverlay forceMount={persistent || undefined} className={persistent ? "data-[state=closed]:hidden" : undefined} />
       <DialogPrimitive.Content
+        forceMount={persistent || undefined}
         className={cn(
           "fixed top-1/2 left-1/2 z-[101] grid max-h-[min(720px,calc(100dvh-32px))] w-[calc(100%-32px)] max-w-xl -translate-x-1/2 -translate-y-1/2 gap-4 overflow-hidden rounded-2xl border border-black/10 bg-white p-6 shadow-2xl outline-none",
+          "max-sm:top-0 max-sm:left-0 max-sm:h-dvh max-sm:max-h-none max-sm:w-dvw max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:gap-3 max-sm:rounded-none max-sm:border-0 max-sm:p-4",
+          persistent && "data-[state=closed]:hidden",
           className,
         )}
         {...props}

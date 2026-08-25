@@ -27,6 +27,16 @@ import { AppUpdateChecker } from "@/components/app-update-checker";
 import { BuildInfo } from "@/components/build-info";
 import { SourceArchiveProgressDialog } from "@/components/source-archive-progress-dialog";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { SweepShine } from "@/components/ui/sweep-shine";
 import { Slider } from "@/components/ui/slider";
@@ -37,6 +47,7 @@ import {
   QR_GRID_CELLS,
   QR_SYMBOLS_PER_TICK,
   SEND_SPEED_CHANGE_EVENT,
+  SEND_SPEED_SYNC_EVENT,
   SEND_SPEED_PROFILES,
 } from "../shared/send-settings";
 import { HEADER_LEN } from "../shared/protocol";
@@ -46,6 +57,7 @@ import {
   recommendedProfileLabel,
 } from "../shared/device-profile";
 import { SEND_PROGRESS_EVENT, type SendProgressDetail } from "../shared/send-events";
+import { RECEIVE_CAPTURE_CLOSE_EVENT } from "../shared/receive-events";
 import { inspectDeviceCapabilities } from "@/lib/device-capabilities";
 
 type RouteKey = "home" | "send" | "receive" | "clipboard";
@@ -58,8 +70,8 @@ const routeTitles: Record<RouteKey, string> = {
 };
 
 const viewShell =
-  "relative isolate mx-auto flex min-h-[calc(100svh-60px)] w-full max-w-[720px] flex-1 flex-col items-center gap-3.5 overflow-hidden px-4 py-[clamp(42px,7vw,68px)] text-center sm:px-6";
-const headingClass = "text-[clamp(40px,8vw,54px)] leading-none font-bold tracking-[-0.05em]";
+  "relative isolate mx-auto flex min-h-[calc(100svh-52px)] w-full max-w-[720px] flex-1 flex-col items-center gap-3 overflow-hidden px-3 py-8 text-center sm:min-h-[calc(100svh-60px)] sm:gap-3.5 sm:px-6 sm:py-[clamp(42px,7vw,68px)]";
+const headingClass = "text-[clamp(32px,9vw,54px)] leading-none font-bold tracking-[-0.05em]";
 
 function routeFromPath(pathname: string): RouteKey {
   if (pathname === "/send") return "send";
@@ -100,18 +112,19 @@ function Header({ route, transitionTo }: { route: RouteKey; transitionTo: (to: s
   const navClass = ({ isActive }: { isActive: boolean }) =>
     cn(
       "relative z-10 min-w-17 rounded-full px-3 py-1.5 text-center text-xs font-semibold transition-colors",
+      "max-sm:min-w-0 max-sm:px-2 max-sm:text-[11px]",
       isActive ? "bg-white text-zinc-950" : "text-zinc-500 hover:text-zinc-950",
     );
 
   return (
     <header
       hidden={route === "home"}
-      className="sticky top-0 z-50 grid min-h-15 grid-cols-[44px_auto_44px] items-center justify-between border-b border-black/8 bg-[#f5f5f7]/85 px-4 py-2 backdrop-blur-xl"
+      className="sticky top-0 z-50 grid min-h-13 grid-cols-[36px_minmax(0,1fr)_36px] items-center justify-between border-b border-black/8 bg-[#f5f5f7]/85 px-2 py-1.5 backdrop-blur-xl sm:min-h-15 sm:grid-cols-[44px_auto_44px] sm:px-4 sm:py-2"
     >
       <Button asChild variant="ghost" size="icon" className="rounded-full" aria-label="返回首页">
         <Link to="/" onClick={(event) => handleRouteClick(event, "/", transitionTo)}><ArrowLeft /></Link>
       </Button>
-      <nav className="flex gap-0.5 rounded-full bg-zinc-200/75 p-1" aria-label="功能切换">
+      <nav className="mx-auto flex min-w-0 gap-0.5 rounded-full bg-zinc-200/75 p-1" aria-label="功能切换">
         <NavLink to="/send" className={navClass} onClick={(event) => handleRouteClick(event, "/send", transitionTo)}>发送</NavLink>
         <NavLink to="/receive" className={navClass} onClick={(event) => handleRouteClick(event, "/receive", transitionTo)}>接收</NavLink>
         <NavLink to="/clipboard" className={navClass} onClick={(event) => handleRouteClick(event, "/clipboard", transitionTo)}>剪贴板</NavLink>
@@ -239,6 +252,7 @@ function FileSelectPanel({
   directoryInputId,
   descriptionId,
   description,
+  directoryControl,
   directoryLabel = "选择文件夹",
   fileNameId,
 }: {
@@ -247,6 +261,7 @@ function FileSelectPanel({
   directoryInputId?: string;
   descriptionId?: string;
   description: string;
+  directoryControl?: React.ReactNode;
   directoryLabel?: string;
   fileNameId: string;
 }) {
@@ -261,11 +276,11 @@ function FileSelectPanel({
         <label htmlFor={inputId} className={cn(buttonVariants({ variant: "outline" }), "cursor-pointer")}>
           <Upload />选择文件
         </label>
-        {directoryInputId ? (
+        {directoryControl ?? (directoryInputId ? (
           <label htmlFor={directoryInputId} className={cn(buttonVariants({ variant: "outline" }), "cursor-pointer")}>
             <FolderArchive />{directoryLabel}
           </label>
-        ) : null}
+        ) : null)}
       </div>
       <input id={inputId} className="sr-only" type="file" />
       {directoryInputId ? (
@@ -285,7 +300,6 @@ function FileSelectPanel({
 function SendView() {
   return (
     <main data-route-page data-view="send" className={cn(viewShell, "max-w-[1200px] overflow-visible")}>
-      <SourceArchiveProgressDialog />
       <section data-reveal className="relative z-10 mb-4 w-full max-w-[720px] text-center">
         <h1 id="tool-title" className={headingClass}>发送文件</h1>
         <p data-breathe className="mt-3.5 text-base text-zinc-500">选择内容后，二维码会自动开始播放。</p>
@@ -299,7 +313,7 @@ function SendView() {
           directoryInputId="cfg-source-directory"
           descriptionId="file-picker-label"
           description="选择文件或前端/Python工程"
-          directoryLabel="选择工程文件夹"
+          directoryControl={<SourceArchiveProgressDialog directoryInputId="cfg-source-directory" />}
           fileNameId="send-file-name"
         />
       </div>
@@ -308,27 +322,65 @@ function SendView() {
         <textarea id="snippet-text" rows={7} placeholder="粘贴或输入文字" className="min-h-44 w-full resize-y rounded-2xl border border-black/10 bg-white p-4 text-left text-base leading-relaxed font-normal text-zinc-950 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10" />
         <Button id="send-snippet" type="button" className="mt-1 w-fit">开始发送</Button>
       </div>
-      <div className="stage relative z-10 max-w-[calc(100vw-2rem)] self-center overflow-hidden rounded-2xl bg-white p-3 sm:p-4" id="stage" hidden>
-        <div id="qr-grid" className="qr-grid" aria-label="4 QR 高吞吐传输画面">
-          {Array.from({ length: QR_GRID_CELLS }, (_, index) => (
-            <canvas
-              key={index}
-              id={index === 0 ? "qr" : `qr-${index}`}
-              data-qr-symbol={index}
-              width="16"
-              height="16"
-              aria-label={`QR ${index + 1}`}
-            />
-          ))}
-        </div>
-      </div>
-      <SendBroadcastProgress />
-      <TransferSpeedControl />
+      <SendTransferDialog />
     </main>
   );
 }
 
-function TransferSpeedControl() {
+function SendTransferDialog() {
+  const [open, setOpen] = useState(false);
+  const [hasTransfer, setHasTransfer] = useState(false);
+  const activeRef = useRef(false);
+
+  useEffect(() => {
+    const update = (event: Event) => {
+      const detail = (event as CustomEvent<SendProgressDetail>).detail;
+      if (detail.active && !activeRef.current) setOpen(true);
+      activeRef.current = detail.active;
+      setHasTransfer(detail.active);
+      if (!detail.active) setOpen(false);
+    };
+    window.addEventListener(SEND_PROGRESS_EVENT, update);
+    return () => window.removeEventListener(SEND_PROGRESS_EVENT, update);
+  }, []);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      {hasTransfer ? <DialogTrigger asChild><Button type="button" variant="outline">查看二维码发送</Button></DialogTrigger> : null}
+      <DialogContent
+        persistent
+        className="top-0 left-0 h-dvh max-h-none w-dvw max-w-none translate-x-0 translate-y-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-2 rounded-none border-0 bg-zinc-100 p-2 sm:gap-3 sm:p-5"
+      >
+        <DialogHeader className="px-1">
+          <DialogTitle className="text-base sm:text-lg">二维码发送</DialogTitle>
+          <DialogDescription className="hidden sm:block">保持二维码完整可见；关闭弹窗后发送仍会在后台继续。</DialogDescription>
+        </DialogHeader>
+        <div id="qr-display-area" className="grid min-h-0 place-items-center overflow-hidden rounded-2xl bg-white p-2 sm:p-4">
+          <div className="stage max-w-full overflow-hidden rounded-xl bg-white p-1" id="stage" hidden>
+            <div id="qr-grid" className="qr-grid" aria-label="4 QR 高吞吐传输画面">
+              {Array.from({ length: QR_GRID_CELLS }, (_, index) => (
+                <canvas
+                  key={index}
+                  id={index === 0 ? "qr" : `qr-${index}`}
+                  data-qr-symbol={index}
+                  width="16"
+                  height="16"
+                  aria-label={`QR ${index + 1}`}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="grid max-h-[30dvh] shrink-0 gap-1 overflow-y-auto rounded-xl border border-black/[0.07] bg-white p-1.5 sm:gap-2 sm:p-2 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.55fr)]">
+          <SendBroadcastProgress compact />
+          <TransferSpeedControl compact />
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function TransferSpeedControl({ compact = false }: { compact?: boolean }) {
   const [index, setIndex] = useState(DEFAULT_SPEED_PROFILE_INDEX);
   const [inspection, setInspection] = useState("正在检测处理器、内存、刷新率和可用画面尺寸…");
   const manuallySelected = useRef(false);
@@ -363,24 +415,32 @@ function TransferSpeedControl() {
     return () => { cancelled = true; };
   }, []);
 
+  useEffect(() => {
+    const sync = (event: Event) => setIndex((event as CustomEvent<number>).detail);
+    window.addEventListener(SEND_SPEED_SYNC_EVENT, sync);
+    return () => window.removeEventListener(SEND_SPEED_SYNC_EVENT, sync);
+  }, []);
+
   return (
     <section
       id="cfg-speed"
       data-speed-index={index}
-      data-reveal
-      className="relative z-10 w-full max-w-[720px] rounded-2xl border border-black/[0.07] bg-white p-5 text-left"
+      className={cn(
+        "relative z-10 w-full text-left",
+        compact ? "rounded-lg bg-zinc-50 px-3 py-2.5" : "max-w-[720px] rounded-2xl border border-black/[0.07] bg-white p-5",
+      )}
     >
-      <div className="flex items-end justify-between gap-4">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-zinc-950">传输速度</p>
-          <p className="mt-1 text-xs text-zinc-500">自动选择当前电脑可承受的最高档位</p>
+          <p className="text-xs font-semibold text-zinc-950">传输速度</p>
+          {!compact ? <p className="mt-1 text-xs text-zinc-500">自动选择当前电脑可承受的最高档位</p> : null}
         </div>
-        <output className="shrink-0 text-right text-sm font-semibold text-blue-600">
+        <output className="shrink-0 text-right text-xs font-semibold text-blue-600">
           {profile.label} · 约 {rawKiBPerSecond} KiB/s
         </output>
       </div>
       <Slider
-        className="mt-5"
+        className={compact ? "mt-2.5" : "mt-5"}
         value={[index]}
         min={0}
         max={SEND_SPEED_PROFILES.length - 1}
@@ -388,14 +448,20 @@ function TransferSpeedControl() {
         aria-label="传输速度"
         onValueChange={changeSpeed}
       />
-      <div className="mt-2 flex justify-between text-xs font-medium text-zinc-400">
+      <div className={cn("flex justify-between font-medium text-zinc-400", compact ? "mt-1 text-[10px]" : "mt-2 text-xs")}>
         <span>最低</span>
         <span>最高</span>
       </div>
-      <p className="mt-4 text-xs leading-relaxed text-zinc-500" aria-live="polite">{inspection}</p>
-      <p className="mt-1 text-[11px] leading-relaxed text-zinc-400">
-        检测仅覆盖发送电脑；相机、远程桌面压缩和接收端性能不可见，识别不稳时请手动降档。
-      </p>
+      {compact ? (
+        <p className="mt-1 truncate text-[10px] text-zinc-400" aria-live="polite">{inspection}</p>
+      ) : (
+        <>
+          <p className="mt-4 text-xs leading-relaxed text-zinc-500" aria-live="polite">{inspection}</p>
+          <p className="mt-1 text-[11px] leading-relaxed text-zinc-400">
+            检测仅覆盖发送电脑；相机、远程桌面压缩和接收端性能不可见，识别不稳时请手动降档。
+          </p>
+        </>
+      )}
     </section>
   );
 }
@@ -408,7 +474,7 @@ const idleSendProgress: SendProgressDetail = {
   targetSymbols: 0,
 };
 
-function SendBroadcastProgress() {
+function SendBroadcastProgress({ compact = false }: { compact?: boolean }) {
   const [progress, setProgress] = useState(idleSendProgress);
 
   useEffect(() => {
@@ -421,53 +487,77 @@ function SendBroadcastProgress() {
 
   if (!progress.active) return null;
   return (
-    <section className="relative z-10 w-full max-w-[720px] rounded-2xl border border-black/[0.07] bg-white p-4 text-left" aria-live="polite">
-      <div className="mb-2 flex items-center justify-between gap-3 text-xs">
+    <section className={cn("relative z-10 w-full text-left", compact ? "px-3 py-2.5" : "max-w-[720px] rounded-2xl border border-black/[0.07] bg-white p-4")} aria-live="polite">
+      <div className={cn("flex items-center justify-between gap-3 text-xs", compact ? "mb-1.5" : "mb-2")}>
         <strong className="text-zinc-950">第 {progress.round} 轮广播 · {Math.floor(progress.percent)}%</strong>
         <span className="text-zinc-500">{progress.emittedSymbols}/{progress.targetSymbols} symbols</span>
       </div>
       <Progress value={progress.percent} aria-label="发送广播进度" />
-      <p className="mt-2 text-[11px] text-zinc-400">表示一轮建议 symbol 已播放的比例；接收是否完成以接收端进度为准。</p>
+      <p className={cn("text-zinc-400", compact ? "mt-1 text-[10px]" : "mt-2 text-[11px]")}>一轮建议symbol播放比例；是否完成以接收端为准。</p>
     </section>
   );
 }
 
 function ReceiveView() {
+  const [captureOpen, setCaptureOpen] = useState(false);
+
+  const changeCaptureOpen = (next: boolean) => {
+    setCaptureOpen(next);
+    if (!next) window.dispatchEvent(new Event(RECEIVE_CAPTURE_CLOSE_EVENT));
+  };
+
   return (
     <main data-route-page data-view="receive" className={viewShell}>
       <section className="receiver-primary relative z-10 flex w-full flex-col items-center gap-3.5 text-center">
         <div data-reveal className="mb-2 w-full text-center">
           <h1 data-breathe className={headingClass}>接收</h1>
-          <div className="status-line mt-3.5 min-h-5 text-center font-mono text-xs text-zinc-500" id="stats">选择扫描方式开始</div>
+          <p className="mt-3.5 text-base text-zinc-500">选择扫描方式后，在全屏窗口中查看画面和接收进度。</p>
         </div>
         <div data-reveal className="capture-actions flex flex-wrap justify-center gap-2.5" id="capture-actions">
-          <Button id="start" type="button" className="min-w-52">扫描电脑屏幕</Button>
-          <Button id="start-camera" type="button" variant="outline">使用相机</Button>
+          <Button id="start" type="button" className="min-w-52" onClick={() => setCaptureOpen(true)}>扫描电脑屏幕</Button>
+          <Button id="start-camera" type="button" variant="outline" onClick={() => setCaptureOpen(true)}>使用相机</Button>
         </div>
-        <div className="preview relative aspect-video max-h-[calc(100dvh-145px)] w-full overflow-hidden rounded-2xl bg-zinc-950" id="preview" style={{ display: "none" }}>
-          <video id="video" muted playsInline />
-        </div>
-        <div className="transfer-hud w-full px-0.5 pt-0.5">
-          <div className="progress" id="progress" style={{ display: "none" }} role="progressbar" aria-label="接收进度" aria-valuemin={0} aria-valuemax={100} aria-valuenow={0}><div id="bar" /></div>
-          <div className="progress-status mt-2 flex gap-3.5 font-mono text-xs text-zinc-500" id="progress-status" style={{ display: "none" }} aria-live="polite">
-            <strong id="progress-label" className="shrink-0 text-zinc-950">0% · 0 帧</strong>
-            <span id="eta-label" className="min-w-0 flex-1 truncate text-right">正在估算时间</span>
-          </div>
-        </div>
-        <div id="result" />
-        <details id="diagnostics" className="w-full rounded-2xl border border-black/[0.07] bg-white p-4 text-left" style={{ display: "none" }}>
-          <summary className="cursor-pointer text-center text-sm font-semibold text-zinc-600">解码性能与诊断</summary>
-          <div id="metrics" className="mt-4 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
-            <span>捕获 FPS <strong id="m-cap">—</strong></span><span>有效码 FPS <strong id="m-dec">—</strong></span><span>净带宽 <strong id="m-rate">—</strong></span><span>耗时 <strong id="m-time">—</strong></span>
-            <span>新帧/重复 <strong id="m-frames">—</strong></span><span>数据块 K <strong id="m-k">—</strong></span><span>块大小 <strong id="m-block">—</strong></span><span>负载 <strong id="m-payload">—</strong></span>
-          </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <label className="grid gap-1 text-xs font-medium text-zinc-500">解码宽度<select id="cfg-width" defaultValue="1280" className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-zinc-900"><option>960</option><option>1280</option><option>1920</option></select></label>
-            <label className="grid gap-1 text-xs font-medium text-zinc-500">捕获 FPS<select id="cfg-capfps" defaultValue="60" className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-zinc-900"><option>30</option><option>60</option></select></label>
-            <label className="grid gap-1 text-xs font-medium text-zinc-500">Worker 数<select id="cfg-workers" defaultValue="2" className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-zinc-900"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
-          </div>
-          <span id="capture-actual" className="mt-3 block text-xs text-zinc-500" />
-        </details>
+        <Dialog open={captureOpen} onOpenChange={changeCaptureOpen}>
+          <DialogContent
+            persistent
+            className="top-0 left-0 h-dvh max-h-none w-dvw max-w-none translate-x-0 translate-y-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-2 rounded-none border-0 bg-zinc-950 p-2 text-white sm:gap-3 sm:p-5"
+          >
+            <DialogHeader className="px-1 text-white">
+              <DialogTitle className="text-base text-white sm:text-lg">实时扫描</DialogTitle>
+              <DialogDescription className="hidden text-zinc-400 sm:block">上方显示完整扫描画面，底部显示接收进度和解码状态。</DialogDescription>
+              <div className="status-line min-h-5 font-mono text-xs text-zinc-400" id="stats">选择扫描方式开始</div>
+            </DialogHeader>
+            <div className="grid min-h-0 place-items-center overflow-hidden rounded-2xl bg-black">
+              <div className="preview relative h-full max-h-full w-full overflow-hidden bg-black" id="preview" style={{ display: "none" }}>
+                <video id="video" muted playsInline className="h-full w-full object-contain" />
+              </div>
+            </div>
+            <div className="grid max-h-[38dvh] gap-3 overflow-y-auto rounded-2xl bg-white p-4 text-zinc-950">
+              <div className="transfer-hud w-full px-0.5 pt-0.5">
+                <div className="progress" id="progress" style={{ display: "none" }} role="progressbar" aria-label="接收进度" aria-valuemin={0} aria-valuemax={100} aria-valuenow={0}><div id="bar" /></div>
+                <div className="progress-status mt-2 flex gap-3.5 font-mono text-xs text-zinc-500" id="progress-status" style={{ display: "none" }} aria-live="polite">
+                  <strong id="progress-label" className="shrink-0 text-zinc-950">0% · 0帧</strong>
+                  <span id="eta-label" className="min-w-0 flex-1 truncate text-right">正在估算时间</span>
+                </div>
+              </div>
+              <div id="result" />
+              <details id="diagnostics" className="w-full rounded-xl border border-black/[0.07] bg-zinc-50 p-4 text-left" style={{ display: "none" }}>
+                <summary className="cursor-pointer text-center text-sm font-semibold text-zinc-600">解码性能与诊断</summary>
+                <div id="metrics" className="mt-4 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+                  <span>捕获 FPS <strong id="m-cap">—</strong></span><span>有效码 FPS <strong id="m-dec">—</strong></span><span>净带宽 <strong id="m-rate">—</strong></span><span>耗时 <strong id="m-time">—</strong></span>
+                  <span>新帧/重复 <strong id="m-frames">—</strong></span><span>数据块 K <strong id="m-k">—</strong></span><span>块大小 <strong id="m-block">—</strong></span><span>负载 <strong id="m-payload">—</strong></span>
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <label className="grid gap-1 text-xs font-medium text-zinc-500">解码宽度<select id="cfg-width" defaultValue="1280" className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-zinc-900"><option>960</option><option>1280</option><option>1920</option></select></label>
+                  <label className="grid gap-1 text-xs font-medium text-zinc-500">捕获 FPS<select id="cfg-capfps" defaultValue="60" className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-zinc-900"><option>30</option><option>60</option></select></label>
+                  <label className="grid gap-1 text-xs font-medium text-zinc-500">Worker数<select id="cfg-workers" defaultValue="2" className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-zinc-900"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
+                </div>
+                <span id="capture-actual" className="mt-3 block text-xs text-zinc-500" />
+              </details>
+              <DialogFooter><DialogClose asChild><Button type="button" variant="outline">停止扫描并关闭</Button></DialogClose></DialogFooter>
+            </div>
+          </DialogContent>
+        </Dialog>
       </section>
     </main>
   );

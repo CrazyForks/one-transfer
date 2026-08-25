@@ -32,6 +32,7 @@ import { mediaAspectRatio } from "../shared/display";
 import { NO_SIGNAL_HINT_FRAME_BYTES, NO_SIGNAL_HINT_TX_FPS } from "../shared/send-settings";
 import { statusLine } from "../shared/status-line";
 import { requestScreenWakeLock } from "../shared/wake-lock";
+import { RECEIVE_CAPTURE_CLOSE_EVENT } from "../shared/receive-events";
 
 export function mountReceive() {
 const startBtn = document.getElementById("start") as HTMLButtonElement;
@@ -88,6 +89,8 @@ let busyDropCount = 0;
 
 startBtn.onclick = () => void start("screen");
 cameraBtn.onclick = () => void start("camera");
+const onCaptureDialogClose = () => stopCaptureForNavigation();
+window.addEventListener(RECEIVE_CAPTURE_CLOSE_EVENT, onCaptureDialogClose);
 
 const { setStatus, showLoading, showError } = statusLine(stats);
 
@@ -650,6 +653,7 @@ function updateStats() {
 
 return () => {
   disposed = true;
+  window.removeEventListener(RECEIVE_CAPTURE_CLOSE_EVENT, onCaptureDialogClose);
   stopCaptureForNavigation();
   if (resultObjectUrl) URL.revokeObjectURL(resultObjectUrl);
 };

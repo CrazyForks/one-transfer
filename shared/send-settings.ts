@@ -32,6 +32,7 @@ export const SEND_SPEED_PROFILES: readonly SendSpeedProfile[] = [
 
 export const DEFAULT_SPEED_PROFILE_INDEX = 0;
 export const SEND_SPEED_CHANGE_EVENT = "one-transfer:speed-change";
+export const SEND_SPEED_SYNC_EVENT = "one-transfer:speed-sync";
 
 // The hint values appear in these lists by construction, not by coincidence.
 export const TX_FPS_OPTIONS: readonly number[] = [

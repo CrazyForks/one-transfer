@@ -1,4 +1,6 @@
 export const SOURCE_ARCHIVE_PROGRESS_EVENT = "one-transfer:source-archive-progress";
+export const SOURCE_ARCHIVE_OPTIONS_EVENT = "one-transfer:source-archive-options";
+export const SOURCE_ARCHIVE_SEND_EVENT = "one-transfer:source-archive-send";
 
 export type SourceArchiveProgressState = "idle" | "running" | "success" | "error";
 
@@ -8,4 +10,9 @@ export interface SourceArchiveProgressDetail {
   readonly message: string;
   readonly archiveName?: string;
   readonly archiveBytes?: number;
+  readonly downloadUrl?: string;
+}
+
+export interface SourceArchiveOptionsDetail {
+  readonly includeGit: boolean;
 }

@@ -2,6 +2,7 @@ import {
   createSourceArchive,
   type BrowserSourceFile,
   type SourceArchive,
+  type SourceArchiveOptions,
   type SourceArchiveWorkProgress,
 } from "./source-archive";
 
@@ -13,6 +14,7 @@ interface ArchiveRequest {
     readonly relativePath: string;
   }>;
   readonly maxArchiveBytes: number;
+  readonly options: SourceArchiveOptions;
 }
 
 type ArchiveResponse =
@@ -30,7 +32,7 @@ self.onmessage = (event: MessageEvent<ArchiveRequest>) => {
   void createSourceArchive(files, event.data.maxArchiveBytes, (progress) => {
     const response: ArchiveResponse = { type: "progress", progress };
     self.postMessage(response);
-  })
+  }, event.data.options)
     .then((archive) => {
       const response: ArchiveResponse = { type: "success", archive };
       self.postMessage(response, { transfer: [archive.bytes.buffer] });
