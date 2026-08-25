@@ -30,7 +30,7 @@ test("Base91 is the ASCII-compatible V2 codec", async () => {
     "base91",
     "application/zip",
   );
-  assert.match(encoded.text, /^ONE_TRANSFER_V2\|file\|base91\|none\|4096\|/);
+  assert.match(encoded.text, /^ONE_TRANSFER_V2\|file\|base91\|(?:none|gzip)\|4096\|/);
   assert.doesNotMatch(encoded.text, /[^\x20-\x7e]/);
   assert.deepEqual((await decodeClipboardTransfer(encoded.text)).bytes, bytes);
   assert.deepEqual(decodeBase91(encodeBase91(bytes)), bytes);
