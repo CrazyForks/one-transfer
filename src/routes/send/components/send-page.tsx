@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
+import { FolderOpen } from "lucide-react";
 
 import { SourceArchiveProgressDialog } from "@/components/source-archive-progress-dialog";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -85,6 +86,17 @@ function SendModeTabs() {
   );
 }
 
+function SendDirectoryActions() {
+  return (
+    <>
+      <label htmlFor="cfg-directory" className={cn(buttonVariants({ variant: "outline" }), "app-style-31")}>
+        <FolderOpen />完整文件夹
+      </label>
+      <SourceArchiveProgressDialog directoryInputId="cfg-source-directory" />
+    </>
+  );
+}
+
 export function SendPage() {
   return (
     <main data-route-page data-view="send" className={cn(VIEW_SHELL, "app-style-33")}>
@@ -98,10 +110,11 @@ export function SendPage() {
         <FileSelectPanel
           panelId="pane-file"
           inputId="cfg-file"
-          directoryInputId="cfg-source-directory"
+          directoryInputId="cfg-directory"
+          projectDirectoryInputId="cfg-source-directory"
           descriptionId="file-picker-label"
-          description="选择文件或前端/Python工程"
-          directoryControl={<SourceArchiveProgressDialog directoryInputId="cfg-source-directory" />}
+          description="选择文件、完整文件夹或前端/Python工程"
+          directoryControl={<SendDirectoryActions />}
           fileNameId="send-file-name"
         />
       </div>

@@ -6,8 +6,8 @@
 //   combinations instead of letting four independent controls fight each other.
 // - The mask pattern is pinned (any declared mask is valid to a decoder);
 //   this skips the spec's 8-way mask evaluation and speeds generation ~4×.
-// - Only one quadrant changes on each visual tick. The other three remain
-//   stable, so a rolling-shutter transition cannot corrupt the whole grid.
+// - Four moderate-density symbols change together on each visual tick. This
+//   restores the aggregate symbol rate that camera tests sustained best.
 // - Error correction stays at L by default: the fountain layer already
 //   handles erasures, and a frame is either decoded whole or discarded.
 
@@ -47,6 +47,8 @@ import {
   SEND_SPEED_PROFILES,
 } from "../shared/send-settings";
 import { createSourceArchiveInWorker } from "../shared/source-archive-client";
+import { createClipboardDirectoryArchiveInWorker } from "../shared/clipboard-processing-client";
+import { isValidWindowsFileName } from "../shared/clipboard-transfer";
 import {
   SOURCE_ARCHIVE_PROGRESS_EVENT,
   SOURCE_ARCHIVE_CLEAR_EVENT,
@@ -66,6 +68,7 @@ const stage = document.getElementById("stage") as HTMLDivElement;
 const qrDisplayArea = document.getElementById("qr-display-area") as HTMLDivElement;
 const specs = document.getElementById("specs")!;
 const cfgFile = document.getElementById("cfg-file") as HTMLInputElement;
+const cfgDirectory = document.getElementById("cfg-directory") as HTMLInputElement;
 const cfgSourceDirectory = document.getElementById("cfg-source-directory") as HTMLInputElement;
 const filePickerLabel = document.getElementById("file-picker-label")!;
 const fileNameLabel = document.getElementById("send-file-name")!;
@@ -86,6 +89,7 @@ let selectedFile: {
   transmittedSize: number;
 } | null = null;
 let sourceArchiveAbortController: AbortController | null = null;
+let directoryArchiveAbortController: AbortController | null = null;
 let sourceArchiveDownloadUrl: string | null = null;
 let sourceArchiveOptions: SourceArchiveOptionsDetail = { includeGit: false };
 let generation = 0; // bumped on every restart; stale loops see it and die
@@ -131,6 +135,11 @@ function cancelSourceArchive(): void {
   reportSourceArchive({ state: "idle", percent: 0, message: "" });
 }
 
+function cancelDirectoryArchive(): void {
+  directoryArchiveAbortController?.abort();
+  directoryArchiveAbortController = null;
+}
+
 function revokeSourceArchiveDownload(): void {
   if (!sourceArchiveDownloadUrl) return;
   URL.revokeObjectURL(sourceArchiveDownloadUrl);
@@ -140,11 +149,13 @@ function revokeSourceArchiveDownload(): void {
 function clearFileSelection(preserveArchiveDialog = false): void {
   sourceArchiveAbortController?.abort();
   sourceArchiveAbortController = null;
+  cancelDirectoryArchive();
   revokeSourceArchiveDownload();
   invalidateStream();
   selectedFile = null;
   stage.hidden = true;
   cfgFile.value = "";
+  cfgDirectory.value = "";
   cfgSourceDirectory.value = "";
   fileNameLabel.textContent = "未选择文件或文件夹";
   setStatus("选择文件开始");
@@ -187,6 +198,7 @@ function currentMode(): "file" | "snippet" {
 /** Switching what we're sending kills any stream in flight and clears the stage. */
 function applyMode(): void {
   cancelSourceArchive();
+  cancelDirectoryArchive();
   revokeSourceArchiveDownload();
   invalidateStream();
   selectedFile = null;
@@ -200,6 +212,7 @@ function applyMode(): void {
   // A file left in the picker survives the switch, so re-arm it rather than
   // leaving a filename on screen next to "choose a file to begin".
   if (mode === "file" && cfgFile.files?.[0]) void selectFile();
+  else if (mode === "file" && cfgDirectory.files?.length) void selectDirectory();
   else if (mode === "file" && cfgSourceDirectory.files?.length) void selectSourceDirectory();
 }
 
@@ -269,6 +282,63 @@ async function selectFile(): Promise<void> {
       packed: await packFile(file.name, file.type, bytes, maxFileBytes),
     };
   });
+}
+
+async function selectDirectory(): Promise<void> {
+  cancelSourceArchive();
+  revokeSourceArchiveDownload();
+  const files = [...(cfgDirectory.files ?? [])];
+  if (files.length === 0) return;
+  if (files.length > 65_535) {
+    showError("文件夹包含的文件超过 65,535 个，ZIP 格式无法安全保存。");
+    return;
+  }
+
+  const paths = files.map((file) => file.webkitRelativePath.replace(/\\/g, "/"));
+  const rootName = paths[0]?.split("/")[0] ?? "";
+  if (!isValidWindowsFileName(rootName)) {
+    showError("文件夹名称无法在 Windows 中使用，请先重命名。");
+    return;
+  }
+  for (const path of paths) {
+    const segments = path.split("/");
+    if (
+      segments.length < 2 ||
+      segments[0] !== rootName ||
+      segments.some((segment) => !segment || segment === "." || segment === ".." || !isValidWindowsFileName(segment))
+    ) {
+      showError("文件夹中包含无法在 Windows 中使用的路径或文件名。");
+      return;
+    }
+  }
+
+  const abortController = new AbortController();
+  directoryArchiveAbortController = abortController;
+  fileNameLabel.textContent = `${rootName} · ${files.length.toLocaleString()} 个文件`;
+  try {
+    await startSelection(`正在 Worker 中压缩 ${rootName}…`, async () => {
+      const archive = await createClipboardDirectoryArchiveInWorker(
+        files.map((file, index) => ({ path: paths[index]!, blob: file })),
+        abortController.signal,
+      );
+      const maxFileBytes = activeMaxFileBytes();
+      if (archive.length > maxFileBytes) {
+        throw new Error(
+          `${rootName}.zip 大小为 ${formatBytes(archive.length)}，` +
+          `超过“${activeSpeedProfile().label}”档 ${formatBytes(maxFileBytes)} 限制。`,
+        );
+      }
+      const archiveName = `${rootName}.zip`;
+      fileNameLabel.textContent = `${archiveName} · ${files.length.toLocaleString()} 个文件 · ${formatBytes(archive.length)}`;
+      return {
+        name: archiveName,
+        size: archive.length,
+        packed: await packFile(archiveName, "application/zip", archive, maxFileBytes),
+      };
+    });
+  } finally {
+    if (directoryArchiveAbortController === abortController) directoryArchiveAbortController = null;
+  }
 }
 
 async function selectSourceDirectory(): Promise<void> {
@@ -354,8 +424,10 @@ async function main() {
   // system picker therefore leaves an honest empty state instead of silently
   // retaining an old file or QR stream.
   cfgFile.addEventListener("click", () => clearFileSelection());
+  cfgDirectory.addEventListener("click", () => clearFileSelection());
   cfgSourceDirectory.addEventListener("click", () => clearFileSelection(true));
   cfgFile.addEventListener("change", () => void selectFile());
+  cfgDirectory.addEventListener("change", () => void selectDirectory());
   cfgSourceDirectory.addEventListener("change", () => void selectSourceDirectory());
   sendSnippetBtn.addEventListener("click", () => void selectSnippet());
   for (const input of modeInputs) input.addEventListener("change", applyMode);
@@ -631,6 +703,7 @@ void main();
 
 return () => {
   cancelSourceArchive();
+  cancelDirectoryArchive();
   invalidateStream();
   window.removeEventListener("resize", onResize);
   window.removeEventListener(SEND_SPEED_CHANGE_EVENT, onSpeedChange);
