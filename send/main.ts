@@ -41,6 +41,11 @@ import {
   SEND_SPEED_CHANGE_EVENT,
   SEND_SPEED_PROFILES,
 } from "../shared/send-settings";
+import { createSourceArchiveInWorker } from "../shared/source-archive-client";
+import {
+  SOURCE_ARCHIVE_PROGRESS_EVENT,
+  type SourceArchiveProgressDetail,
+} from "../shared/source-archive-events";
 
 const MARGIN = 4; // quiet-zone modules
 const LOOKAHEAD_SYMBOLS = 8;
@@ -51,6 +56,7 @@ const canvases = [...qrGrid.querySelectorAll<HTMLCanvasElement>("[data-qr-symbol
 const stage = document.getElementById("stage") as HTMLDivElement;
 const specs = document.getElementById("specs")!;
 const cfgFile = document.getElementById("cfg-file") as HTMLInputElement;
+const cfgSourceDirectory = document.getElementById("cfg-source-directory") as HTMLInputElement;
 const filePickerLabel = document.getElementById("file-picker-label")!;
 const fileNameLabel = document.getElementById("send-file-name")!;
 const toolTitle = document.getElementById("tool-title")!;
@@ -69,6 +75,7 @@ let selectedFile: {
   compression: "none" | "gzip";
   transmittedSize: number;
 } | null = null;
+let sourceArchiveAbortController: AbortController | null = null;
 let generation = 0; // bumped on every restart; stale loops see it and die
 let resizeDisplay: (() => void) | null = null;
 let stopStream: (() => void) | null = null;
@@ -86,7 +93,7 @@ function activeMaxFileBytes(): number {
 }
 
 function updateFileLimitLabel(): void {
-  filePickerLabel.textContent = `任意文件 · 最大 ${formatBytes(activeMaxFileBytes())}`;
+  filePickerLabel.textContent = `任意文件或源码文件夹 · 最大 ${formatBytes(activeMaxFileBytes())}`;
 }
 
 const specsLine = statusLine(specs);
@@ -100,6 +107,16 @@ function invalidateStream(): number {
   stopStream = null;
   reportSendProgress({ active: false, percent: 0, round: 1, emittedSymbols: 0, targetSymbols: 0 });
   return generation;
+}
+
+function cancelSourceArchive(): void {
+  sourceArchiveAbortController?.abort();
+  sourceArchiveAbortController = null;
+  reportSourceArchive({ state: "idle", percent: 0, message: "" });
+}
+
+function reportSourceArchive(detail: SourceArchiveProgressDetail): void {
+  window.dispatchEvent(new CustomEvent<SourceArchiveProgressDetail>(SOURCE_ARCHIVE_PROGRESS_EVENT, { detail }));
 }
 
 function reportSendProgress(detail: SendProgressDetail) {
@@ -125,6 +142,7 @@ function currentMode(): "file" | "snippet" {
 
 /** Switching what we're sending kills any stream in flight and clears the stage. */
 function applyMode(): void {
+  cancelSourceArchive();
   invalidateStream();
   selectedFile = null;
   stage.hidden = true;
@@ -137,6 +155,7 @@ function applyMode(): void {
   // A file left in the picker survives the switch, so re-arm it rather than
   // leaving a filename on screen next to "choose a file to begin".
   if (mode === "file" && cfgFile.files?.[0]) void selectFile();
+  else if (mode === "file" && cfgSourceDirectory.files?.length) void selectSourceDirectory();
 }
 
 /**
@@ -170,11 +189,13 @@ async function startSelection(
     void requestScreenWakeLock();
     await startStream(true);
   } catch (error) {
+    if (selectionGeneration !== generation) return;
     showError(error instanceof Error ? error.message : String(error));
   }
 }
 
 async function selectFile(): Promise<void> {
+  cancelSourceArchive();
   const file = cfgFile.files?.[0];
   if (!file) return;
   fileNameLabel.textContent = file.name;
@@ -202,7 +223,66 @@ async function selectFile(): Promise<void> {
   });
 }
 
+async function selectSourceDirectory(): Promise<void> {
+  cancelSourceArchive();
+  const files = [...(cfgSourceDirectory.files ?? [])];
+  if (files.length === 0) return;
+  const abortController = new AbortController();
+  sourceArchiveAbortController = abortController;
+  let progressPercent = 0;
+  const selectedRoot = files[0]?.webkitRelativePath.replace(/\\/g, "/").split("/")[0] || "源码文件夹";
+  fileNameLabel.textContent = `${selectedRoot} · 正在筛选源码…`;
+  reportSourceArchive({ state: "running", percent: 0, message: `已选择 ${selectedRoot}，准备启动 Worker` });
+  try {
+    await startSelection(`正在 Worker 中过滤并压缩 ${selectedRoot}…`, async () => {
+      try {
+        const maxFileBytes = activeMaxFileBytes();
+        const archive = await createSourceArchiveInWorker(
+          files,
+          maxFileBytes,
+          abortController.signal,
+          (progress) => {
+            progressPercent = progress.percent;
+            reportSourceArchive({ state: "running", ...progress });
+          },
+        );
+        fileNameLabel.textContent =
+          `${archive.name} · ${formatBytes(archive.inputBytes)} → ZIP ${formatBytes(archive.bytes.length)}` +
+          ` · 保留 ${archive.includedFileCount.toLocaleString()} 个` +
+          ` · 排除 ${archive.excludedFileCount.toLocaleString()} 个`;
+        const packed = await packFile(archive.name, "application/zip", archive.bytes, maxFileBytes);
+        reportSourceArchive({
+          state: "success",
+          percent: 100,
+          message: `发送文件已准备完成：${archive.name} · ${formatBytes(archive.bytes.length)}`,
+          archiveName: archive.name,
+          archiveBytes: archive.bytes.length,
+        });
+        return {
+          name: archive.name,
+          size: archive.bytes.length,
+          packed,
+        };
+      } catch (error) {
+        if (abortController.signal.aborted) {
+          reportSourceArchive({ state: "idle", percent: 0, message: "" });
+        } else {
+          reportSourceArchive({
+            state: "error",
+            percent: progressPercent,
+            message: error instanceof Error ? error.message : "源码文件夹压缩失败。",
+          });
+        }
+        throw error;
+      }
+    });
+  } finally {
+    if (sourceArchiveAbortController === abortController) sourceArchiveAbortController = null;
+  }
+}
+
 async function selectSnippet(): Promise<void> {
+  cancelSourceArchive();
   await startSelection("正在准备文字…", async () => {
     const packed = await packSnippet(snippetText.value);
     return { name: "文字", size: packed.originalSize, packed };
@@ -223,8 +303,14 @@ async function main() {
   // fresh payload and session.
   cfgFile.addEventListener("click", () => {
     cfgFile.value = "";
+    cfgSourceDirectory.value = "";
+  });
+  cfgSourceDirectory.addEventListener("click", () => {
+    cfgSourceDirectory.value = "";
+    cfgFile.value = "";
   });
   cfgFile.addEventListener("change", () => void selectFile());
+  cfgSourceDirectory.addEventListener("change", () => void selectSourceDirectory());
   sendSnippetBtn.addEventListener("click", () => void selectSnippet());
   for (const input of modeInputs) input.addEventListener("change", applyMode);
   applyMode();
@@ -476,6 +562,7 @@ async function startStream(revealStage = false) {
 void main();
 
 return () => {
+  cancelSourceArchive();
   invalidateStream();
   window.removeEventListener("resize", onResize);
   window.removeEventListener(SEND_SPEED_CHANGE_EVENT, onSpeedChange);

@@ -14,6 +14,7 @@ const fileInput = document.getElementById("clipboard-file") as HTMLInputElement;
 const directoryInput = document.getElementById("clipboard-directory") as HTMLInputElement;
 const copyButton = document.getElementById("copy-transfer") as HTMLButtonElement;
 const fileNameLabel = document.getElementById("clipboard-file-name")!;
+const nextStep = document.getElementById("clipboard-next-step") as HTMLElement;
 const status = statusLine(document.getElementById("clipboard-status")!);
 const toast = document.createElement("div");
 toast.className = "clipboard-toast";
@@ -63,6 +64,7 @@ async function prepareFile(): Promise<void> {
   selected = null;
   copyButton.disabled = true;
   copyButton.textContent = "复制文件数据到剪贴板";
+  nextStep.hidden = true;
 
   if (!file) {
     status.setStatus("请选择要传递的文件或文件夹");
@@ -112,6 +114,7 @@ async function prepareDirectory(): Promise<void> {
   selected = null;
   copyButton.disabled = true;
   copyButton.textContent = "复制文件夹全部内容到剪贴板";
+  nextStep.hidden = true;
 
   if (files.length === 0) {
     status.showError("未读取到文件夹内容；纯空文件夹无法通过浏览器选择器传输");
@@ -293,11 +296,12 @@ async function copyTransfer(
     else await writeClipboard(text);
     if (expectedGeneration !== generation) return;
     status.setStatus(
-      `${name} ${automatic ? "已自动复制" : "已复制"}为 ASCII 兼容文本，` +
-        "请到 Windows 接收端运行还原脚本",
+      `${name} ${automatic ? "已自动复制" : "已复制"}。下一步：切换到 Windows，` +
+        "等待剪贴板同步后运行 one-transfer-restore.bat",
     );
     copyButton.textContent = automatic ? "已自动复制 · 再次复制" : "已复制 · 再次复制";
-    showToast(`${name} ${automatic ? "已自动复制" : "已复制"}到剪贴板`, "success");
+    nextStep.hidden = false;
+    showToast(`${name} 已复制，请按页面提示到 Windows 恢复`, "success");
   } catch {
     if (expectedGeneration !== generation) return;
     status.showError(
@@ -305,6 +309,7 @@ async function copyTransfer(
         ? `${name} 已编码，但浏览器阻止自动复制，请点击下方按钮重试`
         : "复制失败，请允许浏览器写入剪贴板后重试",
     );
+    nextStep.hidden = true;
     copyButton.textContent = "点击复制到剪贴板";
     showToast(
       automatic ? "自动复制失败，请点击按钮重试" : "复制失败，请允许剪贴板权限后重试",

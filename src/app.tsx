@@ -5,6 +5,7 @@ import {
   ChevronRight,
   ClipboardPaste,
   Download,
+  FolderArchive,
   ScanLine,
   Upload,
 } from "lucide-react";
@@ -24,6 +25,7 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button";
 import { AppUpdateChecker } from "@/components/app-update-checker";
 import { BuildInfo } from "@/components/build-info";
+import { SourceArchiveProgressDialog } from "@/components/source-archive-progress-dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { SweepShine } from "@/components/ui/sweep-shine";
@@ -237,6 +239,7 @@ function FileSelectPanel({
   directoryInputId,
   descriptionId,
   description,
+  directoryLabel = "选择文件夹",
   fileNameId,
 }: {
   panelId?: string;
@@ -244,6 +247,7 @@ function FileSelectPanel({
   directoryInputId?: string;
   descriptionId?: string;
   description: string;
+  directoryLabel?: string;
   fileNameId: string;
 }) {
   return (
@@ -259,7 +263,7 @@ function FileSelectPanel({
         </label>
         {directoryInputId ? (
           <label htmlFor={directoryInputId} className={cn(buttonVariants({ variant: "outline" }), "cursor-pointer")}>
-            <Upload />选择文件夹
+            <FolderArchive />{directoryLabel}
           </label>
         ) : null}
       </div>
@@ -281,6 +285,7 @@ function FileSelectPanel({
 function SendView() {
   return (
     <main data-route-page data-view="send" className={cn(viewShell, "max-w-[1200px] overflow-visible")}>
+      <SourceArchiveProgressDialog />
       <section data-reveal className="relative z-10 mb-4 w-full max-w-[720px] text-center">
         <h1 id="tool-title" className={headingClass}>发送文件</h1>
         <p data-breathe className="mt-3.5 text-base text-zinc-500">选择内容后，二维码会自动开始播放。</p>
@@ -291,8 +296,10 @@ function SendView() {
         <FileSelectPanel
           panelId="pane-file"
           inputId="cfg-file"
+          directoryInputId="cfg-source-directory"
           descriptionId="file-picker-label"
-          description="选择文件"
+          description="选择文件或前端/Python工程"
+          directoryLabel="选择工程文件夹"
           fileNameId="send-file-name"
         />
       </div>
@@ -503,7 +510,7 @@ function RestoreScriptPanel() {
   };
 
   return (
-    <Card data-reveal className="relative z-10 w-full">
+    <Card id="restore-script-panel" data-reveal className="relative z-10 w-full scroll-mt-20">
       <CardContent className="grid justify-items-center gap-4 p-6 text-center">
         <div className="grid justify-items-center gap-1">
           <span className="text-[11px] font-bold tracking-wider text-blue-600">WINDOWS 接收端 · 首次使用</span>
@@ -553,6 +560,22 @@ function ClipboardView() {
         <Button id="copy-transfer" type="button" disabled>复制数据到剪贴板</Button>
         <span className="text-sm text-zinc-500">选择后自动复制；文件夹会打包全部文件并保留层级，Windows 端自动解压。</span>
       </div>
+      <section
+        id="clipboard-next-step"
+        hidden
+        aria-live="polite"
+        className="relative z-10 w-full rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-left"
+      >
+        <strong className="text-base text-emerald-900">复制成功，下一步到 Windows 恢复</strong>
+        <ol className="mt-3 grid gap-2 text-sm leading-relaxed text-emerald-950/80">
+          <li><b>1.</b> 切换到 Windows，等待远程剪贴板同步完成。</li>
+          <li><b>2.</b> 将下方的 <code>one-transfer-restore.bat</code> 放到希望保存文件的目录。</li>
+          <li><b>3.</b> 双击运行脚本；脚本会读取剪贴板、校验数据并恢复文件，文件夹会自动解压。</li>
+        </ol>
+        <a href="#restore-script-panel" className="mt-4 inline-flex text-sm font-semibold text-emerald-800 underline underline-offset-4">
+          查看或下载 Windows 还原脚本
+        </a>
+      </section>
       <RestoreScriptPanel />
     </main>
   );
