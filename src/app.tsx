@@ -2,10 +2,12 @@ import * as React from "react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
+  ChevronDown,
   ChevronRight,
   ClipboardPaste,
   Download,
   FolderArchive,
+  FolderOpen,
   ScanLine,
   Upload,
 } from "lucide-react";
@@ -38,6 +40,14 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { SweepShine } from "@/components/ui/sweep-shine";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -250,6 +260,7 @@ function FileSelectPanel({
   panelId,
   inputId,
   directoryInputId,
+  projectDirectoryInputId,
   descriptionId,
   description,
   directoryControl,
@@ -259,6 +270,7 @@ function FileSelectPanel({
   panelId?: string;
   inputId: string;
   directoryInputId?: string;
+  projectDirectoryInputId?: string;
   descriptionId?: string;
   description: string;
   directoryControl?: React.ReactNode;
@@ -292,8 +304,49 @@ function FileSelectPanel({
           {...{ webkitdirectory: "", directory: "" }}
         />
       ) : null}
+      {projectDirectoryInputId ? (
+        <input
+          id={projectDirectoryInputId}
+          className="sr-only"
+          type="file"
+          multiple
+          {...{ webkitdirectory: "", directory: "" }}
+        />
+      ) : null}
       <span id={fileNameId} className="max-w-full truncate text-sm text-zinc-500">未选择文件或文件夹</span>
     </div>
+  );
+}
+
+function ClipboardDirectoryMenu({
+  directoryInputId,
+  projectDirectoryInputId,
+}: {
+  directoryInputId: string;
+  projectDirectoryInputId: string;
+}) {
+  const openPicker = (inputId: string) => {
+    (document.getElementById(inputId) as HTMLInputElement | null)?.click();
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button type="button" variant="outline"><FolderArchive />选择文件夹<ChevronDown /></Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel>选择文件夹类型</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => openPicker(directoryInputId)}>
+          <FolderOpen />
+          完整文件夹
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => openPicker(projectDirectoryInputId)}>
+          <FolderArchive />
+          前端 / Python 工程
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -643,12 +696,19 @@ function ClipboardView() {
       <FileSelectPanel
         inputId="clipboard-file"
         directoryInputId="clipboard-directory"
-        description="发送端 · 选择文件或文件夹"
+        projectDirectoryInputId="clipboard-project-directory"
+        description="发送端 · 选择文件、文件夹或工程"
+        directoryControl={(
+          <ClipboardDirectoryMenu
+            directoryInputId="clipboard-directory"
+            projectDirectoryInputId="clipboard-project-directory"
+          />
+        )}
         fileNameId="clipboard-file-name"
       />
       <div data-reveal className="relative z-10 flex w-full flex-col items-center gap-3.5 text-center">
         <Button id="copy-transfer" type="button" disabled>复制数据到剪贴板</Button>
-        <span className="text-sm text-zinc-500">选择后自动复制；文件夹会打包全部文件并保留层级，Windows 端自动解压。</span>
+        <span className="text-sm text-zinc-500">选择后自动复制；完整文件夹保留全部内容，工程会自动排除依赖和构建产物。</span>
       </div>
       <section
         id="clipboard-next-step"

@@ -8,10 +8,12 @@ import { zip } from "fflate";
 import { formatBytes } from "../shared/format";
 import { MAX_FILE_BYTES, MAX_FILE_LABEL } from "../shared/protocol";
 import { statusLine } from "../shared/status-line";
+import { createSourceArchiveInWorker } from "../shared/source-archive-client";
 
 export function mountClipboard() {
 const fileInput = document.getElementById("clipboard-file") as HTMLInputElement;
 const directoryInput = document.getElementById("clipboard-directory") as HTMLInputElement;
+const projectDirectoryInput = document.getElementById("clipboard-project-directory") as HTMLInputElement;
 const copyButton = document.getElementById("copy-transfer") as HTMLButtonElement;
 const fileNameLabel = document.getElementById("clipboard-file-name")!;
 const nextStep = document.getElementById("clipboard-next-step") as HTMLElement;
@@ -179,6 +181,55 @@ async function prepareDirectory(): Promise<void> {
   }
 }
 
+async function prepareProjectDirectory(): Promise<void> {
+  const files = [...(projectDirectoryInput.files ?? [])];
+  const currentGeneration = ++generation;
+  payload = null;
+  selectedName = "";
+  selected = null;
+  copyButton.disabled = true;
+  copyButton.textContent = "复制工程数据到剪贴板";
+  nextStep.hidden = true;
+
+  if (files.length === 0) return;
+
+  const rootName = files[0]?.webkitRelativePath.replace(/\\/g, "/").split("/")[0] ?? "";
+  fileNameLabel.textContent = `${rootName} · 正在筛选工程文件…`;
+  const automaticWrite = beginDeferredClipboardWrite();
+  status.showLoading(`正在 Worker 中筛选并压缩 ${rootName}…`);
+  try {
+    const archive = await createSourceArchiveInWorker(
+      files,
+      MAX_FILE_BYTES,
+      undefined,
+      (progress) => {
+        if (currentGeneration !== generation) return;
+        status.showLoading(`${progress.message} · ${Math.round(progress.percent)}%`);
+      },
+    );
+    if (currentGeneration !== generation) {
+      automaticWrite?.reject(new Error("工程选择已变更"));
+      return;
+    }
+    fileNameLabel.textContent =
+      `${rootName} · 保留 ${archive.includedFileCount.toLocaleString()} 个` +
+      ` · 排除 ${archive.excludedFileCount.toLocaleString()} 个`;
+    selected = {
+      itemType: "directory",
+      name: rootName,
+      bytes: archive.bytes,
+      mediaType: "application/zip",
+      detail: `工程源码 · ZIP ${formatBytes(archive.bytes.length)}`,
+    };
+    await encodeSelected(currentGeneration, automaticWrite);
+  } catch (error) {
+    automaticWrite?.reject(error);
+    if (currentGeneration !== generation) return;
+    status.showError(error instanceof Error ? error.message : "工程压缩失败，请重新选择");
+    copyButton.textContent = "复制工程数据到剪贴板";
+  }
+}
+
 function createZip(entries: Record<string, Uint8Array>): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
     zip(entries, { level: 6 }, (error, data) => {
@@ -323,13 +374,21 @@ async function copyTransfer(
 fileInput.addEventListener("click", () => {
   fileInput.value = "";
   directoryInput.value = "";
+  projectDirectoryInput.value = "";
 });
 directoryInput.addEventListener("click", () => {
   directoryInput.value = "";
   fileInput.value = "";
+  projectDirectoryInput.value = "";
+});
+projectDirectoryInput.addEventListener("click", () => {
+  projectDirectoryInput.value = "";
+  fileInput.value = "";
+  directoryInput.value = "";
 });
 fileInput.addEventListener("change", () => void prepareFile());
 directoryInput.addEventListener("change", () => void prepareDirectory());
+projectDirectoryInput.addEventListener("change", () => void prepareProjectDirectory());
 copyButton.addEventListener("click", () => void copyTransfer());
 return () => {
   generation++;
