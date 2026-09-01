@@ -145,12 +145,14 @@ const specsLine = statusLine(specs);
 const setStatus = specsLine.setStatus;
 const showLoading = specsLine.showLoading;
 
-function invalidateStream(): number {
+function invalidateStream(announceInactive = true): number {
   generation++;
   resizeDisplay = null;
   stopStream?.();
   stopStream = null;
-  reportSendProgress({ active: false, percent: 0, round: 1, emittedSymbols: 0, targetSymbols: 0 });
+  if (announceInactive) {
+    reportSendProgress({ active: false, percent: 0, round: 1, emittedSymbols: 0, targetSymbols: 0 });
+  }
   return generation;
 }
 
@@ -487,7 +489,7 @@ const onResize = () => resizeDisplay?.();
 const onSpeedChange = (event: Event) => {
   sendTuning = normalizeSendTuning((event as CustomEvent<SendTuning>).detail);
   updateFileLimitLabel();
-  void startStream();
+  void startStream(false, true);
 };
 const onSenderCapabilities = (event: Event) => {
   detectedSenderCapabilities = (event as CustomEvent<SenderCapabilitiesDetail>).detail;
@@ -506,8 +508,8 @@ function scrollStageIntoView() {
   });
 }
 
-async function startStream(revealStage = false) {
-  const gen = invalidateStream();
+async function startStream(revealStage = false, preserveDialog = false) {
+  const gen = invalidateStream(!preserveDialog);
   const tuning = activeSendTuning();
   if (!selectedFile) {
     setStatus(
@@ -613,7 +615,7 @@ async function startStream(revealStage = false) {
         sendTuning = nextTuning;
         window.dispatchEvent(new CustomEvent<SendTuning>(SEND_SPEED_SYNC_EVENT, { detail: sendTuning }));
         setStatus(`当前画面较窄，已把每码字节自动调整为 ${nextFrameBytes}`);
-        window.setTimeout(() => void startStream(true), 0);
+        window.setTimeout(() => void startStream(true, true), 0);
         return;
       }
     }

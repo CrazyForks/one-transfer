@@ -260,7 +260,7 @@ function TransferSpeedControl({ compact = false }: { compact?: boolean }) {
             max={SEND_TUNING_LIMITS.frameBytes.max}
             step={25}
             value={tuning.frameBytes}
-            onChange={(event) => updateTuning("frameBytes", Number(event.currentTarget.value))}
+            onInput={(event) => updateTuning("frameBytes", Number(event.currentTarget.value))}
           />
         </label>
         <label>
@@ -271,7 +271,7 @@ function TransferSpeedControl({ compact = false }: { compact?: boolean }) {
             max={SEND_TUNING_LIMITS.txFps.max}
             step={1}
             value={tuning.txFps}
-            onChange={(event) => updateTuning("txFps", Number(event.currentTarget.value))}
+            onInput={(event) => updateTuning("txFps", Number(event.currentTarget.value))}
           />
         </label>
         <label>
@@ -282,7 +282,7 @@ function TransferSpeedControl({ compact = false }: { compact?: boolean }) {
             max={SEND_TUNING_LIMITS.symbolsPerTick.max}
             step={1}
             value={tuning.symbolsPerTick}
-            onChange={(event) => updateTuning("symbolsPerTick", Number(event.currentTarget.value))}
+            onInput={(event) => updateTuning("symbolsPerTick", Number(event.currentTarget.value))}
           />
         </label>
       </div>

@@ -9,6 +9,22 @@ type WorkerMessage = {
   message?: string;
 };
 
+function waitForControllerChange(timeoutMs: number): Promise<void> {
+  if (!("serviceWorker" in navigator)) return Promise.resolve();
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      navigator.serviceWorker.removeEventListener("controllerchange", finish);
+      resolve();
+    };
+    const timer = window.setTimeout(finish, timeoutMs);
+    navigator.serviceWorker.addEventListener("controllerchange", finish, { once: true });
+  });
+}
+
 export function AppUpdateChecker() {
   const [available, setAvailable] = useState(false);
   const [pending, setPending] = useState(false);
@@ -59,10 +75,14 @@ export function AppUpdateChecker() {
     setPending(true);
     const next = new URL(window.location.href);
     next.searchParams.set("t", Date.now().toString());
-    window.history.replaceState(window.history.state, "", next);
     try {
       const registration = await navigator.serviceWorker?.getRegistration();
-      await registration?.update();
+      if (registration) {
+        const controllerChange = waitForControllerChange(1500);
+        await registration.update();
+        registration.waiting?.postMessage({ type: "SKIP_WAITING" });
+        await controllerChange;
+      }
     } catch (error) {
       console.debug("Service worker update check failed.", error);
     }

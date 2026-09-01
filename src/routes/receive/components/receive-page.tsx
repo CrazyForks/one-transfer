@@ -96,25 +96,25 @@ export function ReceivePage() {
                 <pre id="receive-log">等待扫描…</pre>
               </div>
             </section>
+            <section id="link-calibration" className="receive-link-calibration" hidden aria-live="polite">
+              <div className="receive-link-calibration-header">
+                <strong>设备动态匹配</strong>
+                <span id="link-calibration-status">等待发送端能力信息</span>
+              </div>
+              <div className="receive-link-calibration-grid">
+                <span>发送端 <strong id="link-sender-info">—</strong></span>
+                <span>接收端 <strong id="link-receiver-info">—</strong></span>
+              </div>
+              <div id="link-sender-recommendation" className="receive-link-recommendation">
+                收到能力信息后给出发送端数字建议
+              </div>
+            </section>
             <div className="app-style-81">
               <div className="app-style-82" id="preview" style={{ display: "none" }}>
                 <video id="video" muted playsInline className="app-style-83" />
               </div>
             </div>
             <div className="app-style-84 receive-controls-panel">
-              <section id="link-calibration" className="receive-link-calibration" hidden aria-live="polite">
-                <div className="receive-link-calibration-header">
-                  <strong>设备动态匹配</strong>
-                  <span id="link-calibration-status">等待发送端能力信息</span>
-                </div>
-                <div className="receive-link-calibration-grid">
-                  <span>发送端 <strong id="link-sender-info">—</strong></span>
-                  <span>接收端 <strong id="link-receiver-info">—</strong></span>
-                </div>
-                <div id="link-sender-recommendation" className="receive-link-recommendation">
-                  收到能力信息后给出发送端数字建议
-                </div>
-              </section>
               <div className="transfer-hud">
                 <div className="progress" id="progress" style={{ display: "none" }} role="progressbar" aria-label="接收进度" aria-valuemin={0} aria-valuemax={100} aria-valuenow={0}><div id="bar" /></div>
                 <div className="progress-status" id="progress-status" style={{ display: "none" }} aria-live="polite">
