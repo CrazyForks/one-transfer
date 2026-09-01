@@ -41,7 +41,9 @@ export function SegmentedTabs({
       ease: "power3.out",
       overwrite: "auto",
     });
-    return () => tween.kill();
+    return () => {
+      tween.kill();
+    };
   }, [value]);
 
   return (
