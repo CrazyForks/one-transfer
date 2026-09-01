@@ -7,8 +7,10 @@ const loadSendController = () => import("../../../send/main").then((module) => m
 const loadClipboardSendController = () => import("../../../clipboard/main").then((module) => module.mountClipboardSend);
 
 export function SendRoute() {
-  const sendError = useMountedController(loadSendController);
-  const clipboardError = useMountedController(loadClipboardSendController);
   const [channel, setChannel] = useTransferChannel();
-  return <><ControllerError message={sendError ?? clipboardError} /><SendPage channel={channel} onChannelChange={setChannel} /></>;
+  const sendError = useMountedController(loadSendController, channel === "qr");
+  const clipboardError = useMountedController(loadClipboardSendController, channel === "clipboard");
+  const controllerError = channel === "qr" ? sendError : clipboardError;
+
+  return <><ControllerError message={controllerError} /><SendPage channel={channel} onChannelChange={setChannel} /></>;
 }

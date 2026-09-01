@@ -7,8 +7,10 @@ const loadReceiveController = () => import("../../../receive/main").then((module
 const loadClipboardReceiveController = () => import("../../../clipboard/receive").then((module) => module.mountClipboardReceive);
 
 export function ReceiveRoute() {
-  const receiveError = useMountedController(loadReceiveController);
-  const clipboardError = useMountedController(loadClipboardReceiveController);
   const [channel, setChannel] = useTransferChannel();
-  return <><ControllerError message={receiveError ?? clipboardError} /><ReceivePage channel={channel} onChannelChange={setChannel} /></>;
+  const receiveError = useMountedController(loadReceiveController, channel === "qr");
+  const clipboardError = useMountedController(loadClipboardReceiveController, channel === "clipboard");
+  const controllerError = channel === "qr" ? receiveError : clipboardError;
+
+  return <><ControllerError message={controllerError} /><ReceivePage channel={channel} onChannelChange={setChannel} /></>;
 }

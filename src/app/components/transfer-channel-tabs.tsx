@@ -48,11 +48,11 @@ export function TransferChannelTabs({
       className="transfer-channel-tabs"
       listClassName="transfer-channel-tabs-list"
     >
-      <TabsContent forceMount value="qr" className="transfer-channel-content">
-        {qr}
+      <TabsContent value="qr" className="transfer-channel-content">
+        {channel === "qr" ? qr : null}
       </TabsContent>
-      <TabsContent forceMount value="clipboard" className="transfer-channel-content">
-        {clipboard}
+      <TabsContent value="clipboard" className="transfer-channel-content">
+        {channel === "clipboard" ? clipboard : null}
       </TabsContent>
     </SegmentedTabs>
   );

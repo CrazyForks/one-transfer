@@ -1,11 +1,17 @@
 import { useEffect, useState } from "react";
 
-export function useMountedController(loader: () => Promise<() => () => void>) {
+export function useMountedController(
+  loader: () => Promise<() => () => void>,
+  enabled = true,
+) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!enabled) return;
+
     let disposed = false;
     let cleanup: (() => void) | undefined;
+    setError(null);
     loader()
       .then((mount) => {
         if (!disposed) cleanup = mount();
@@ -18,7 +24,7 @@ export function useMountedController(loader: () => Promise<() => () => void>) {
       disposed = true;
       cleanup?.();
     };
-  }, [loader]);
+  }, [enabled, loader]);
 
   return error;
 }
