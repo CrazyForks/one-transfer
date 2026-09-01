@@ -1,5 +1,6 @@
 import {
-  createSourceArchive,
+  createSourceArchiveFromSelection,
+  prepareSourceArchiveSelection,
   type BrowserSourceFile,
   type SourceArchive,
   type SourceArchiveOptions,
@@ -11,20 +12,32 @@ type ArchiveResponse =
   | { readonly type: "success"; readonly archive: SourceArchive }
   | { readonly type: "error"; readonly message: string };
 
-export function createSourceArchiveInWorker(
-  files: readonly BrowserSourceFile[],
+export async function createSourceArchiveInWorker(
+  files: ArrayLike<BrowserSourceFile>,
   maxArchiveBytes: number,
   signal?: AbortSignal,
   onProgress: (progress: SourceArchiveWorkProgress) => void = () => undefined,
   options: SourceArchiveOptions = {},
 ): Promise<SourceArchive> {
-  if (typeof Worker === "undefined") return createSourceArchive(files, maxArchiveBytes, onProgress, options);
+  const selection = await prepareSourceArchiveSelection(
+    files,
+    onProgress,
+    options,
+    { signal },
+  );
+  const fallback = () => createSourceArchiveFromSelection(
+    selection,
+    maxArchiveBytes,
+    onProgress,
+    signal,
+  );
+  if (typeof Worker === "undefined") return fallback();
 
   let worker: Worker;
   try {
     worker = new Worker(new URL("./source-archive.worker.ts", import.meta.url), { type: "module" });
   } catch {
-    return createSourceArchive(files, maxArchiveBytes, onProgress, options);
+    return fallback();
   }
 
   return new Promise((resolve, reject) => {
@@ -56,14 +69,18 @@ export function createSourceArchiveInWorker(
       else resolve(event.data.archive);
     };
     worker.postMessage({
-      files: files.map((file) => ({
-        blob: file,
-        name: file.name,
-        size: file.size,
-        relativePath: file.webkitRelativePath,
-      })),
+      selection: {
+        rootName: selection.rootName,
+        excludedFileCount: selection.excludedFileCount,
+        inputBytes: selection.inputBytes,
+        included: selection.included.map(({ file, path }) => ({
+          blob: file,
+          name: file.name,
+          size: file.size,
+          path,
+        })),
+      },
       maxArchiveBytes,
-      options,
     });
   });
 }

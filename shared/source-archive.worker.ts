@@ -1,20 +1,24 @@
 import {
-  createSourceArchive,
+  createSourceArchiveFromSelection,
   type BrowserSourceFile,
+  type PreparedSourceArchiveSelection,
   type SourceArchive,
-  type SourceArchiveOptions,
   type SourceArchiveWorkProgress,
 } from "./source-archive";
 
 interface ArchiveRequest {
-  readonly files: Array<{
-    readonly blob: Blob;
-    readonly name: string;
-    readonly size: number;
-    readonly relativePath: string;
-  }>;
+  readonly selection: {
+    readonly rootName: string;
+    readonly excludedFileCount: number;
+    readonly inputBytes: number;
+    readonly included: Array<{
+      readonly blob: Blob;
+      readonly name: string;
+      readonly size: number;
+      readonly path: string;
+    }>;
+  };
   readonly maxArchiveBytes: number;
-  readonly options: SourceArchiveOptions;
 }
 
 type ArchiveResponse =
@@ -23,16 +27,25 @@ type ArchiveResponse =
   | { readonly type: "error"; readonly message: string };
 
 self.onmessage = (event: MessageEvent<ArchiveRequest>) => {
-  const files: BrowserSourceFile[] = event.data.files.map((item) => ({
-    name: item.name,
-    size: item.size,
-    webkitRelativePath: item.relativePath,
-    arrayBuffer: () => item.blob.arrayBuffer(),
-  }));
-  void createSourceArchive(files, event.data.maxArchiveBytes, (progress) => {
+  const request = event.data;
+  const selection: PreparedSourceArchiveSelection = {
+    rootName: request.selection.rootName,
+    excludedFileCount: request.selection.excludedFileCount,
+    inputBytes: request.selection.inputBytes,
+    included: request.selection.included.map((item) => {
+      const file: BrowserSourceFile = {
+        name: item.name,
+        size: item.size,
+        webkitRelativePath: item.path,
+        arrayBuffer: () => item.blob.arrayBuffer(),
+      };
+      return { file, path: item.path };
+    }),
+  };
+  void createSourceArchiveFromSelection(selection, request.maxArchiveBytes, (progress) => {
     const response: ArchiveResponse = { type: "progress", progress };
     self.postMessage(response);
-  }, event.data.options)
+  })
     .then((archive) => {
       const response: ArchiveResponse = { type: "success", archive };
       self.postMessage(response, { transfer: [archive.bytes.buffer] });

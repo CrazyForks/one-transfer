@@ -41,6 +41,7 @@ export function SourceArchiveProgressDialog({
   const [open, setOpen] = useState(false);
   const [includeGit, setIncludeGit] = useState(false);
   const [detail, setDetail] = useState<SourceArchiveProgressDetail>(initialDetail);
+  const [waitingForPicker, setWaitingForPicker] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const lastMessage = useRef("");
 
@@ -49,14 +50,14 @@ export function SourceArchiveProgressDialog({
       const next = (event as CustomEvent<SourceArchiveProgressDetail>).detail;
       if (next.state === "idle") {
         setDetail(initialDetail);
+        setWaitingForPicker(false);
         setLogs([]);
         lastMessage.current = "";
         return;
       }
-      if (next.percent === 0 && next.state === "running") {
-        setLogs([]);
-        lastMessage.current = "";
-        setOpen(true);
+      if (next.state === "running" && next.percent > 0) {
+        setWaitingForPicker(false);
+        if (next.percent <= 2) setOpen(true);
       }
       setDetail(next);
       if (next.message && next.message !== lastMessage.current) {
@@ -69,9 +70,11 @@ export function SourceArchiveProgressDialog({
   }, []);
 
   const chooseDirectory = () => {
+    clearPreviousSelection();
     const options: SourceArchiveOptionsDetail = { includeGit };
     window.dispatchEvent(new CustomEvent<SourceArchiveOptionsDetail>(SOURCE_ARCHIVE_OPTIONS_EVENT, { detail: options }));
     const message = "等待浏览器选择并授权工程文件夹";
+    setWaitingForPicker(true);
     setDetail({ state: "running", percent: 0, message });
     setLogs([`压缩配置：${includeGit ? "包含 .git" : "不包含 .git"}`, message]);
     lastMessage.current = message;
@@ -80,6 +83,18 @@ export function SourceArchiveProgressDialog({
 
   const clearPreviousSelection = () => {
     window.dispatchEvent(new Event(SOURCE_ARCHIVE_CLEAR_EVENT));
+  };
+
+  const resetForNewSelection = () => {
+    clearPreviousSelection();
+    setWaitingForPicker(false);
+    setDetail(initialDetail);
+    setLogs([]);
+    lastMessage.current = "";
+  };
+
+  const cancelProcessing = () => {
+    resetForNewSelection();
   };
 
   const sendByQr = () => {
@@ -92,13 +107,19 @@ export function SourceArchiveProgressDialog({
 
   const complete = detail.state === "success";
   const failed = detail.state === "error";
-  const waitingForPicker = detail.state === "running" && detail.percent === 0;
+  const processing = detail.state === "running" && !waitingForPicker;
   const StatusIcon = complete ? CheckCircle2 : failed ? XCircle : CircleDashed;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button type="button" variant="outline" onClick={clearPreviousSelection}><FolderArchive />选择工程文件夹</Button>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={processing ? undefined : resetForNewSelection}
+        >
+          <FolderArchive />{processing ? "查看工程处理进度" : "选择工程文件夹"}
+        </Button>
       </DialogTrigger>
       <DialogContent className="source-archive-progress-dialog-style-01">
         <DialogHeader>
@@ -106,7 +127,7 @@ export function SourceArchiveProgressDialog({
             <Archive className="source-archive-progress-dialog-style-03" />
             {complete ? "工程压缩完成" : failed ? "工程压缩失败" : "准备工程压缩包"}
           </DialogTitle>
-          <DialogDescription>浏览器授权目录后，筛选、读取和压缩均在本地Worker中完成。</DialogDescription>
+          <DialogDescription>浏览器授权目录后，页面会分批筛选路径，Worker只读取并压缩保留的源码。</DialogDescription>
         </DialogHeader>
 
         <label className="source-archive-progress-dialog-style-04">
@@ -170,6 +191,11 @@ export function SourceArchiveProgressDialog({
             <Button type="button" onClick={chooseDirectory}><FolderArchive />{waitingForPicker ? "重新选择" : "选择工程目录"}</Button>
           ) : null}
           {detail.state === "running" && !waitingForPicker ? <Button type="button" disabled>处理中…</Button> : null}
+          {processing ? (
+            <DialogClose asChild>
+              <Button type="button" variant="outline" onClick={cancelProcessing}>取消处理</Button>
+            </DialogClose>
+          ) : null}
           {complete && completionAction === "qr" ? (
             <DialogClose asChild><Button type="button" onClick={sendByQr}>二维码发送</Button></DialogClose>
           ) : null}

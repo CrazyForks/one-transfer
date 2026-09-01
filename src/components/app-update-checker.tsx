@@ -55,10 +55,17 @@ export function AppUpdateChecker() {
 
   if (!available) return null;
 
-  const update = () => {
+  const update = async () => {
     setPending(true);
     const next = new URL(window.location.href);
-    next.searchParams.set("update", Date.now().toString());
+    next.searchParams.set("t", Date.now().toString());
+    window.history.replaceState(window.history.state, "", next);
+    try {
+      const registration = await navigator.serviceWorker?.getRegistration();
+      await registration?.update();
+    } catch (error) {
+      console.debug("Service worker update check failed.", error);
+    }
     window.location.replace(next.toString());
   };
 

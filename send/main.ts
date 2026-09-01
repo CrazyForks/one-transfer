@@ -6,8 +6,8 @@
 //   combinations instead of letting four independent controls fight each other.
 // - The mask pattern is pinned (any declared mask is valid to a decoder);
 //   this skips the spec's 8-way mask evaluation and speeds generation ~4×.
-// - Four moderate-density symbols change together on each visual tick. This
-//   restores the aggregate symbol rate that camera tests sustained best.
+// - Each speed profile controls how many of the four visible symbols change on
+//   a visual tick: constrained displays rotate one cell, capable senders batch four.
 // - Error correction stays at L by default: the fountain layer already
 //   handles erasures, and a frame is either decoded whole or discarded.
 
@@ -37,11 +37,14 @@ import {
 import { statusLine } from "../shared/status-line";
 import { requestScreenWakeLock } from "../shared/wake-lock";
 import { expectedFountainOverhead } from "../shared/progress";
-import { SEND_PROGRESS_EVENT, type SendProgressDetail } from "../shared/send-events";
+import {
+  SEND_PROGRESS_EVENT,
+  isSendProgressReportDue,
+  type SendProgressDetail,
+} from "../shared/send-events";
 import {
   DEFAULT_SPEED_PROFILE_INDEX,
   QR_GRID_CELLS,
-  QR_SYMBOLS_PER_TICK,
   SEND_SPEED_CHANGE_EVENT,
   SEND_SPEED_SYNC_EVENT,
   SEND_SPEED_PROFILES,
@@ -176,6 +179,12 @@ const onSourceArchiveClear = () => clearFileSelection(true);
 
 function reportSendProgress(detail: SendProgressDetail) {
   window.dispatchEvent(new CustomEvent<SendProgressDetail>(SEND_PROGRESS_EVENT, { detail }));
+}
+
+function afterNextPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
 }
 
 /**
@@ -342,16 +351,17 @@ async function selectDirectory(): Promise<void> {
 }
 
 async function selectSourceDirectory(): Promise<void> {
-  cancelSourceArchive();
+  sourceArchiveAbortController?.abort();
+  sourceArchiveAbortController = null;
   revokeSourceArchiveDownload();
-  const files = [...(cfgSourceDirectory.files ?? [])];
-  if (files.length === 0) return;
+  const files = cfgSourceDirectory.files;
+  if (!files?.length) return;
   const abortController = new AbortController();
   sourceArchiveAbortController = abortController;
   let progressPercent = 0;
   const selectedRoot = files[0]?.webkitRelativePath.replace(/\\/g, "/").split("/")[0] || "源码文件夹";
   fileNameLabel.textContent = `${selectedRoot} · 正在筛选源码…`;
-  reportSourceArchive({ state: "running", percent: 0, message: `已选择 ${selectedRoot}，准备启动 Worker` });
+  reportSourceArchive({ state: "running", percent: 1, message: `已选择 ${selectedRoot}，正在准备文件列表` });
   try {
     await startSelection(`正在 Worker 中过滤并压缩 ${selectedRoot}…`, async () => {
       try {
@@ -370,7 +380,18 @@ async function selectSourceDirectory(): Promise<void> {
           `${archive.name} · ${formatBytes(archive.inputBytes)} → ZIP ${formatBytes(archive.bytes.length)}` +
           ` · 保留 ${archive.includedFileCount.toLocaleString()} 个` +
           ` · 排除 ${archive.excludedFileCount.toLocaleString()} 个`;
+        progressPercent = 96;
+        reportSourceArchive({
+          state: "running",
+          percent: 96,
+          message: "ZIP 已生成，正在校验并封装二维码数据",
+          archiveName: archive.name,
+          archiveBytes: archive.bytes.length,
+        });
+        await afterNextPaint();
+        if (abortController.signal.aborted) throw new Error("源码文件夹压缩已取消。");
         const packed = await packFile(archive.name, "application/zip", archive.bytes, maxFileBytes);
+        if (abortController.signal.aborted) throw new Error("源码文件夹压缩已取消。");
         sourceArchiveDownloadUrl = URL.createObjectURL(new Blob([archive.bytes as BlobPart], { type: "application/zip" }));
         reportSourceArchive({
           state: "success",
@@ -475,6 +496,7 @@ async function startStream(revealStage = false) {
   if (gen !== generation) return; // superseded while fetching
   const txFps = speedProfile.txFps;
   const frameBytes = speedProfile.frameBytes;
+  const symbolsPerTick = speedProfile.symbolsPerTick;
   const ecc = "L" as const;
 
   const sessionId = (Math.floor(Math.random() * 0xffff) + 1) & 0xffff;
@@ -493,12 +515,17 @@ async function startStream(revealStage = false) {
     );
     return;
   }
-  const encoder = new LTEncoder(payload, blockLen, sessionId);
+  const sourceBlocks = sourceBlockCount(payload.length, frameBytes);
   const targetSymbols = Math.ceil(
-    encoder.k * expectedFountainOverhead(encoder.k) / QR_SYMBOLS_PER_TICK,
-  ) * QR_SYMBOLS_PER_TICK;
+    sourceBlocks * expectedFountainOverhead(sourceBlocks) / symbolsPerTick,
+  ) * symbolsPerTick;
   let emittedSymbols = 0;
   reportSendProgress({ active: true, percent: 0, round: 1, emittedSymbols, targetSymbols });
+  showLoading(`${speedProfile.label}档 · 正在初始化 ${sourceBlocks.toLocaleString()} 个数据块和首批二维码…`);
+  await afterNextPaint();
+  if (gen !== generation) return;
+
+  const encoder = new LTEncoder(payload, blockLen, sessionId);
   const header: FrameHeader = {
     sessionId,
     seq: 0,
@@ -605,9 +632,11 @@ async function startStream(revealStage = false) {
       // Scroll only now: before sizeCanvas() the canvas is still 16×16, so the
       // scroll target would be the wrong height.
       if (revealStage) scrollStageIntoView();
+      const refreshMode = symbolsPerTick === QR_GRID_CELLS ? "同步刷新" : "轮流刷新";
+      const refreshesPerCode = txFps * symbolsPerTick / QR_GRID_CELLS;
       setStatus(
-        `${speedProfile.label} · ${QR_GRID_CELLS} QR 同步刷新 · ` +
-          `${txFps * QR_SYMBOLS_PER_TICK} symbols/s · 每码 ${txFps} 次/s · ` +
+        `${speedProfile.label} · ${QR_GRID_CELLS} QR ${refreshMode} · ` +
+          `${txFps * symbolsPerTick} symbols/s · 每码 ${refreshesPerCode} 次/s · ` +
           `${frameBytes} 字节 · V${version} · ${scale} px/模块 · ECC ${ecc} · ` +
           `${name} · ${formatBytes(fileSize)} · ` +
           `${compression === "gzip" ? `gzip 后 ${formatBytes(transmittedSize)}` : "未压缩"} · ` +
@@ -622,11 +651,9 @@ async function startStream(revealStage = false) {
    * Refill the symbol lookahead. Generation happens after painting so the
    * visual update never waits for the next QR to be encoded.
    *
-   * Called once up front to fill the queue, then once per tick() — the only
-   * thing that drains it. Self-scheduling on `setTimeout(pump, 0)` instead cost
-   * ~250 wake-ups a second doing nothing once the queue was full. After the
-   * initial fill, generation is deferred until after painting so a visual tick
-   * never waits for the next QR symbol before reaching the screen.
+   * The initial four visible symbols are painted first. Lookahead generation
+   * then starts in a timer and refills once per tick, so opening the QR dialog
+   * never waits for an eager eight-symbol batch on a constrained sender.
    */
   let generatorFailed = false;
   const pump = (max = LOOKAHEAD_SYMBOLS) => {
@@ -652,42 +679,50 @@ async function startStream(revealStage = false) {
     emittedSymbols: emittedInInitialRound,
     targetSymbols,
   });
-  pump();
+  let lastProgressReportAt = performance.now();
 
   const interval = 1000 / txFps;
   let nextAt = performance.now();
   let animationFrameId = 0;
   let pumpTimer: number | null = null;
+  let nextCanvasIndex = 0;
   const schedulePump = () => {
     if (pumpTimer !== null || generatorFailed || gen !== generation) return;
     pumpTimer = window.setTimeout(() => {
       pumpTimer = null;
-      pump(QR_SYMBOLS_PER_TICK);
+      pump(symbolsPerTick);
     }, 0);
   };
+  schedulePump();
   const tick = (now: number) => {
     // generatorFailed means no frame will ever be produced again, so stop the
     // rAF loop rather than spinning on an empty queue until a settings change.
     if (gen !== generation || generatorFailed) return;
     animationFrameId = requestAnimationFrame(tick);
     if (now + 0.5 < nextAt) return;
-    if (queue.length < QR_SYMBOLS_PER_TICK) {
+    if (queue.length < symbolsPerTick) {
       schedulePump();
       nextAt = now + interval;
       return;
     }
-    const batch = queue.splice(0, QR_SYMBOLS_PER_TICK);
-    batch.forEach((frame, index) => drawSymbol(index, frame));
-    emittedSymbols += QR_SYMBOLS_PER_TICK;
-    const round = Math.floor((emittedSymbols - 1) / targetSymbols) + 1;
-    const emittedInRound = ((emittedSymbols - 1) % targetSymbols) + 1;
-    reportSendProgress({
-      active: true,
-      percent: emittedInRound / targetSymbols * 100,
-      round,
-      emittedSymbols: emittedInRound,
-      targetSymbols,
-    });
+    const batch = queue.splice(0, symbolsPerTick);
+    for (const frame of batch) {
+      drawSymbol(nextCanvasIndex, frame);
+      nextCanvasIndex = (nextCanvasIndex + 1) % QR_GRID_CELLS;
+    }
+    emittedSymbols += symbolsPerTick;
+    if (isSendProgressReportDue(now, lastProgressReportAt)) {
+      const round = Math.floor((emittedSymbols - 1) / targetSymbols) + 1;
+      const emittedInRound = ((emittedSymbols - 1) % targetSymbols) + 1;
+      reportSendProgress({
+        active: true,
+        percent: emittedInRound / targetSymbols * 100,
+        round,
+        emittedSymbols: emittedInRound,
+        targetSymbols,
+      });
+      lastProgressReportAt = now;
+    }
     schedulePump();
     nextAt += interval;
     if (now - nextAt > 3 * interval) nextAt = now + interval; // fell behind — don't burst

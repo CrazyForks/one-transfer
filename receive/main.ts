@@ -36,6 +36,10 @@ import {
   RECEIVE_CAPTURE_START_EVENT,
   type ReceiveCaptureSource,
 } from "../shared/receive-events";
+import {
+  initialCameraCaptureFps,
+  initialDecodeWorkers,
+} from "../shared/receive-settings";
 
 export function mountReceive() {
 const startBtn = document.getElementById("start") as HTMLButtonElement;
@@ -105,8 +109,9 @@ let settingsWired = false;
 let statsTimer: ReturnType<typeof setInterval> | undefined;
 let resultObjectUrl: string | null = null;
 let disposed = false;
-let lastAutoScaleDropCount = 0;
-let workersManuallySet = false;
+let cameraFpsInitialized = false;
+let captureFpsManuallySet = false;
+let decodeWorkersInitialized = false;
 let parsedPayloadCount = 0;
 let invalidPayloadCount = 0;
 let lastDiagnosticAt = 0;
@@ -222,6 +227,14 @@ async function start(source: "screen" | "camera") {
     );
     return;
   }
+  const logicalCores = navigator.hardwareConcurrency || 4;
+  if (source === "camera" && !cameraFpsInitialized) {
+    cfgCapFps.value = String(initialCameraCaptureFps(
+      logicalCores,
+      captureFpsManuallySet ? Number(cfgCapFps.value) : undefined,
+    ));
+    cameraFpsInitialized = true;
+  }
   const captureWidth = Number(cfgWidth.value);
   const captureFps = Number(cfgCapFps.value);
   diagnosticLog("capture-request", {
@@ -318,16 +331,16 @@ async function start(source: "screen" | "camera") {
 
   pool.resetMetrics();
   busyDropCount = 0;
-  lastAutoScaleDropCount = 0;
-  workersManuallySet = false;
   captureTimes.length = 0;
   decodeTimes.length = 0;
   parsedPayloadCount = 0;
   invalidPayloadCount = 0;
   lastDiagnosticAt = 0;
-  const logicalCores = navigator.hardwareConcurrency || 4;
-  const suggestedWorkers = logicalCores >= 8 ? 4 : logicalCores >= 6 ? 3 : 2;
-  cfgWorkers.value = String(suggestedWorkers);
+  cfgWorkers.value = String(initialDecodeWorkers(
+    logicalCores,
+    decodeWorkersInitialized ? Number(cfgWorkers.value) : undefined,
+  ));
+  decodeWorkersInitialized = true;
   pool.resize(Number(cfgWorkers.value));
   diagnosticLog("worker-pool-ready", { workers: pool.size });
   reportCaptureSettings();
@@ -335,7 +348,7 @@ async function start(source: "screen" | "camera") {
     settingsWired = true;
     for (const el of [cfgWidth, cfgCapFps, cfgWorkers]) {
       el.addEventListener("change", () => {
-        if (el === cfgWorkers) workersManuallySet = true;
+        if (el === cfgCapFps) captureFpsManuallySet = true;
         void applyReceiveSettings();
       });
     }
@@ -718,12 +731,6 @@ function updateStats() {
   metric("m-cap").textContent = captureFps.toFixed(0);
   metric("m-dec").textContent = decodedPayloadFps.toFixed(1);
   const decode = pool.metrics;
-  const newBusyDrops = busyDropCount - lastAutoScaleDropCount;
-  if (!workersManuallySet && newBusyDrops >= 5 && pool.size < 4) {
-    pool.resize(pool.size + 1);
-    cfgWorkers.value = String(pool.size);
-  }
-  lastAutoScaleDropCount = busyDropCount;
   metricsEl.dataset.decodeAverageMs = decode.averageDecodeMs.toFixed(2);
   metricsEl.dataset.decodedPayloads = String(decode.decodedPayloads);
   metricsEl.dataset.workerBusyDrops = String(busyDropCount + decode.dropped);

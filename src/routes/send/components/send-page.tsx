@@ -28,7 +28,6 @@ import { SEND_PROGRESS_EVENT, type SendProgressDetail } from "../../../../shared
 import {
   DEFAULT_SPEED_PROFILE_INDEX,
   QR_GRID_CELLS,
-  QR_SYMBOLS_PER_TICK,
   SEND_SPEED_CHANGE_EVENT,
   SEND_SPEED_SYNC_EVENT,
   SEND_SPEED_PROFILES,
@@ -187,7 +186,7 @@ function TransferSpeedControl({ compact = false }: { compact?: boolean }) {
   const manuallySelected = useRef(false);
   const profile = SEND_SPEED_PROFILES[index]!;
   const rawKiBPerSecond = Math.round(
-    QR_SYMBOLS_PER_TICK * profile.txFps * (profile.frameBytes - HEADER_LEN) / 1024,
+    profile.symbolsPerTick * profile.txFps * (profile.frameBytes - HEADER_LEN) / 1024,
   );
 
   const applySpeed = (nextIndex: number) => {
@@ -236,7 +235,7 @@ function TransferSpeedControl({ compact = false }: { compact?: boolean }) {
           {!compact ? <p className="app-style-54">自动选择当前电脑可承受的最高档位</p> : null}
         </div>
         <output className="app-style-55">
-          {profile.label} · 约 {rawKiBPerSecond} KiB/s
+          {profile.label} · 理论约 {rawKiBPerSecond} KiB/s
         </output>
       </div>
       <div
@@ -246,7 +245,7 @@ function TransferSpeedControl({ compact = false }: { compact?: boolean }) {
       >
         {SEND_SPEED_PROFILES.map((option, optionIndex) => {
           const speed = Math.round(
-            QR_SYMBOLS_PER_TICK * option.txFps * (option.frameBytes - HEADER_LEN) / 1024,
+            option.symbolsPerTick * option.txFps * (option.frameBytes - HEADER_LEN) / 1024,
           );
           return (
             <button
@@ -257,7 +256,7 @@ function TransferSpeedControl({ compact = false }: { compact?: boolean }) {
               onClick={() => selectSpeed(optionIndex)}
             >
               <strong>{option.label}</strong>
-              <span>约 {speed} KiB/s</span>
+              <span>理论约 {speed} KiB/s</span>
             </button>
           );
         })}
@@ -296,14 +295,19 @@ function SendBroadcastProgress({ compact = false }: { compact?: boolean }) {
   }, []);
 
   if (!progress.active) return null;
+  const preparing = progress.emittedSymbols === 0;
   return (
     <section className={cn("app-style-49", compact ? "app-style-64" : "app-style-65")} aria-live="polite">
       <div className={cn("app-style-66", compact ? "app-style-67" : "app-style-68")}>
-        <strong className="app-style-69">第 {progress.round} 轮广播 · {Math.floor(progress.percent)}%</strong>
+        <strong className="app-style-69">
+          {preparing ? "正在初始化二维码" : `第 ${progress.round} 轮广播 · ${Math.floor(progress.percent)}%`}
+        </strong>
         <span className="app-style-70">{progress.emittedSymbols}/{progress.targetSymbols} symbols</span>
       </div>
       <Progress value={progress.percent} aria-label="发送广播进度" />
-      <p className={cn("app-style-71", compact ? "app-style-59" : "app-style-72")}>一轮建议symbol播放比例；是否完成以接收端为准。</p>
+      <p className={cn("app-style-71", compact ? "app-style-59" : "app-style-72")}>
+        {preparing ? "正在创建编码器和首批二维码，请稍候…" : "一轮建议symbol播放比例；是否完成以接收端为准。"}
+      </p>
     </section>
   );
 }

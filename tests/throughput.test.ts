@@ -6,6 +6,7 @@ import {
   estimateOpticalThroughput,
   estimateRawKiBPerSecond,
 } from "../shared/throughput.ts";
+import { SEND_SPEED_PROFILES } from "../shared/send-settings.ts";
 
 test("the default four-QR layout produces 120 symbols per second", () => {
   const estimate = estimateOpticalThroughput(DEFAULT_OPTICAL_THROUGHPUT_CONFIG, {
@@ -17,6 +18,23 @@ test("the default four-QR layout produces 120 symbols per second", () => {
   assert.equal(estimate.blockBytes, 1680);
   assert.equal(estimate.rawKiBPerSecond, 196.875);
   assert.equal(estimate.netKiBPerSecond, estimate.rawKiBPerSecond);
+});
+
+test("speed profiles declare their own symbols per display tick", () => {
+  const [stable, balanced, high] = SEND_SPEED_PROFILES;
+  assert.deepEqual(stable, {
+    label: "稳定",
+    txFps: 60,
+    frameBytes: 1465,
+    symbolsPerTick: 1,
+  });
+  assert.equal(stable!.symbolsPerTick * stable!.txFps, 60);
+  assert.equal(balanced!.symbolsPerTick * balanced!.txFps, 120);
+  assert.equal(high!.symbolsPerTick * high!.txFps, 120);
+  assert.equal(
+    stable!.symbolsPerTick * stable!.txFps * (stable!.frameBytes - 20) / 1024,
+    84.66796875,
+  );
 });
 
 test("raw throughput excludes the per-symbol protocol header", () => {

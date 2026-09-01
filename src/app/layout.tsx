@@ -5,6 +5,7 @@ import { gsap } from "gsap";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import { AppUpdateChecker } from "@/components/app-update-checker";
+import { BrandMark } from "@/components/brand-mark";
 import { BuildInfo } from "@/components/build-info";
 import { Button } from "@/components/ui/button";
 import { SweepShine } from "@/components/ui/sweep-shine";
@@ -20,10 +21,11 @@ function LoadingScreen({ overlayRef }: { overlayRef: React.RefObject<HTMLDivElem
       role="status"
       aria-label="One Transfer 加载中"
     >
-      <div data-loading-mark className="app-style-02">
-        <strong className="app-style-03">
-          One Transfer
-        </strong>
+      <div className="app-style-02">
+        <BrandMark className="brand-mark brand-mark--loading" />
+        <SweepShine asChild>
+          <strong className="app-style-03">One Transfer</strong>
+        </SweepShine>
         <SweepShine className="app-style-04">用光传递数据</SweepShine>
       </div>
     </div>
@@ -51,7 +53,7 @@ function Header({ route, transitionTo }: { route: RouteKey; transitionTo: Transi
         <NavLink to="/receive" className={navClass} onClick={(event) => handleRouteClick(event, "/receive", transitionTo)}>接收</NavLink>
         <NavLink to="/clipboard" className={navClass} onClick={(event) => handleRouteClick(event, "/clipboard", transitionTo)}>剪贴板</NavLink>
       </nav>
-      <span aria-hidden="true" />
+      <BrandMark className="brand-mark brand-mark--header" />
     </header>
   );
 }
@@ -100,20 +102,6 @@ export function TransferLayout() {
   }, [route]);
 
   useLayoutEffect(() => {
-    if (!loaderVisible || !overlayRef.current) return;
-    const mm = gsap.matchMedia();
-    mm.add("(prefers-reduced-motion: no-preference)", () => {
-      const tween = gsap.fromTo(
-        overlayRef.current!.querySelector("[data-loading-mark]"),
-        { scale: 0.985, autoAlpha: 0.72 },
-        { scale: 1.025, autoAlpha: 1, duration: 1.15, ease: "sine.inOut", repeat: -1, yoyo: true },
-      );
-      return () => tween.kill();
-    });
-    return () => mm.revert();
-  }, [loaderVisible]);
-
-  useLayoutEffect(() => {
     if (!overlayRef.current || !contentRef.current) return;
     const overlay = overlayRef.current;
     const fallback = window.setTimeout(() => setLoaderVisible(false), 1200);
@@ -125,7 +113,6 @@ export function TransferLayout() {
     });
     timeline.to(overlay, {
       autoAlpha: 0,
-      scale: 1.015,
       duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 0.45,
       delay: 0.55,
       ease: "power2.inOut",

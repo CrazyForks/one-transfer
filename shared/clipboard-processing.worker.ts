@@ -1,4 +1,4 @@
-import { encodeClipboardTransfer } from "./clipboard-transfer";
+import { decodeClipboardTransfer, encodeClipboardTransfer } from "./clipboard-transfer";
 import {
   createClipboardDirectoryArchive,
   type ClipboardProcessingRequest,
@@ -18,10 +18,15 @@ self.onmessage = (event: MessageEvent<ClipboardProcessingRequest>) => {
         const response: ClipboardProcessingResponse = { type: "encoded", encoded };
         self.postMessage(response);
       })
-    : createClipboardDirectoryArchive(request.entries).then((bytes) => {
-        const response: ClipboardProcessingResponse = { type: "archive", bytes };
-        self.postMessage(response, { transfer: [bytes.buffer] });
-      });
+    : request.type === "decode"
+      ? decodeClipboardTransfer(request.text).then((decoded) => {
+          const response: ClipboardProcessingResponse = { type: "decoded", decoded };
+          self.postMessage(response, { transfer: [decoded.bytes.buffer as ArrayBuffer] });
+        })
+      : createClipboardDirectoryArchive(request.entries).then((bytes) => {
+          const response: ClipboardProcessingResponse = { type: "archive", bytes };
+          self.postMessage(response, { transfer: [bytes.buffer] });
+        });
 
   void operation.catch((error: unknown) => {
     const response: ClipboardProcessingResponse = {

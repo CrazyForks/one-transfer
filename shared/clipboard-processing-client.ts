@@ -1,7 +1,9 @@
 import {
+  decodeClipboardTransfer,
   encodeClipboardTransfer,
   type ClipboardTextCodec,
   type ClipboardTransferItemType,
+  type DecodedClipboardTransfer,
   type EncodedClipboardTransfer,
 } from "./clipboard-transfer";
 import {
@@ -69,6 +71,16 @@ export async function encodeClipboardTransferInWorker(
   }, [transferable.buffer as ArrayBuffer], signal);
   if (response.type !== "encoded") throw new Error("剪贴板处理 Worker 返回了无效结果。");
   return response.encoded;
+}
+
+export async function decodeClipboardTransferInWorker(
+  text: string,
+  signal?: AbortSignal,
+): Promise<DecodedClipboardTransfer> {
+  if (typeof Worker === "undefined") return decodeClipboardTransfer(text);
+  const response = await runClipboardWorker({ type: "decode", text }, [], signal);
+  if (response.type !== "decoded") throw new Error("剪贴板处理 Worker 返回了无效结果。");
+  return response.decoded;
 }
 
 export async function createClipboardDirectoryArchiveInWorker(

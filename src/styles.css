@@ -25,7 +25,7 @@
   --tw-ring-inset:  ;
   --tw-ring-offset-width: 0px;
   --tw-ring-offset-color: #fff;
-  --tw-ring-color: rgb(59 130 246 / 0.5);
+  --tw-ring-color: rgb(0 0 0 / 0.5);
   --tw-ring-offset-shadow: 0 0 #0000;
   --tw-ring-shadow: 0 0 #0000;
   --tw-shadow: 0 0 #0000;
@@ -79,7 +79,7 @@
   --tw-ring-inset:  ;
   --tw-ring-offset-width: 0px;
   --tw-ring-offset-color: #fff;
-  --tw-ring-color: rgb(59 130 246 / 0.5);
+  --tw-ring-color: rgb(0 0 0 / 0.5);
   --tw-ring-offset-shadow: 0 0 #0000;
   --tw-ring-shadow: 0 0 #0000;
   --tw-shadow: 0 0 #0000;
@@ -562,6 +562,29 @@ body {
   background: #f5f5f7;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+
+.brand-mark {
+  display: block;
+  flex: none;
+}
+
+.brand-mark--loading {
+  width: 3.625rem;
+  height: 3.625rem;
+  margin: 0 auto 0.5rem;
+}
+
+.brand-mark--hero {
+  width: clamp(4.5rem, 10vw, 6rem);
+  height: clamp(4.5rem, 10vw, 6rem);
+  margin: 0 auto 1.5rem;
+}
+
+.brand-mark--header {
+  width: 1.75rem;
+  height: 1.75rem;
+  justify-self: end;
 }
 
 button,
@@ -1217,9 +1240,9 @@ textarea {
 }
 
 .speed-profile-button:hover {
-  color: #2563eb;
-  border-color: rgb(59 130 246 / 0.3);
-  background: #eff6ff;
+  color: #000;
+  border-color: rgb(0 0 0 / 0.3);
+  background: #f4f4f5;
 }
 
 .speed-profile-button:active {
@@ -1228,7 +1251,7 @@ textarea {
 
 .speed-profile-button:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 4px rgb(59 130 246 / 0.15);
+  box-shadow: 0 0 0 4px rgb(0 0 0 / 0.15);
 }
 
 .speed-profile-button strong {
@@ -1246,13 +1269,13 @@ textarea {
 
 .speed-profile-button.is-active {
   color: #fff;
-  border-color: #2563eb;
-  background: #2563eb;
+  border-color: #000;
+  background: #000;
 }
 
 .speed-profile-button.is-active:hover {
   color: #fff;
-  background: #3b82f6;
+  background: #18181b;
 }
 
 .speed-profile-buttons.is-compact .speed-profile-button {
@@ -1673,14 +1696,14 @@ textarea {
 
 .app-style-20 {
   --tw-bg-opacity: 1;
-  background-color: rgb(239 246 255 / var(--tw-bg-opacity, 1));
+  background-color: rgb(244 244 245 / var(--tw-bg-opacity, 1));
 }
 
 .button-style-02,
 .progress-style-02,
 .slider-style-03 {
   --tw-bg-opacity: 1;
-  background-color: rgb(37 99 235 / var(--tw-bg-opacity, 1));
+  background-color: rgb(0 0 0 / var(--tw-bg-opacity, 1));
 }
 
 .source-archive-progress-dialog-style-19,
@@ -2313,10 +2336,6 @@ textarea {
   transition-timing-function: cubic-bezier(0, 0, 0.2, 1);
 }
 
-.app-style-02 {
-  will-change: transform;
-}
-
 @keyframes enter {
   from {
     opacity: var(--tw-enter-opacity, 1);
@@ -2484,7 +2503,7 @@ textarea {
 .progress > div {
   height: 100%;
   width: 0;
-  background: #2563eb;
+  background: #000;
   border-radius: inherit;
   transition: width 250ms ease;
 }
@@ -2535,14 +2554,14 @@ a.download {
   padding: 12px 22px;
   overflow-wrap: anywhere;
   color: #fff;
-  background: #2563eb;
+  background: #000;
   border-radius: 999px;
   font-weight: 600;
   text-decoration: none;
 }
 
 a.download:hover {
-  background: #3b82f6;
+  background: #18181b;
 }
 
 img.received {
@@ -2592,7 +2611,7 @@ img.received {
 .text-button {
   min-height: 0;
   padding: 0;
-  color: #2563eb;
+  color: #000;
   background: transparent;
   border: 0;
   font-size: 13px;
@@ -2600,7 +2619,7 @@ img.received {
 }
 
 .text-button:hover {
-  color: #3b82f6;
+  color: #18181b;
 }
 
 .no-signal-dismiss {
@@ -2649,7 +2668,7 @@ img.received {
 }
 
 .button-style-03:hover {
-  border-color: rgb(59 130 246 / 0.3);
+  border-color: rgb(0 0 0 / 0.3);
 }
 
 .button-style-04:hover {
@@ -2658,12 +2677,12 @@ img.received {
 
 .button-style-03:hover {
   --tw-bg-opacity: 1;
-  background-color: rgb(239 246 255 / var(--tw-bg-opacity, 1));
+  background-color: rgb(244 244 245 / var(--tw-bg-opacity, 1));
 }
 
 .button-style-02:hover {
   --tw-bg-opacity: 1;
-  background-color: rgb(59 130 246 / var(--tw-bg-opacity, 1));
+  background-color: rgb(24 24 27 / var(--tw-bg-opacity, 1));
 }
 
 .dialog-style-05:hover {
@@ -2686,7 +2705,7 @@ img.received {
 .app-style-40:focus,
 .app-style-98:focus {
   --tw-border-opacity: 1;
-  border-color: rgb(59 130 246 / var(--tw-border-opacity, 1));
+  border-color: rgb(0 0 0 / var(--tw-border-opacity, 1));
 }
 
 .app-style-40:focus,
@@ -2698,7 +2717,7 @@ img.received {
 
 .app-style-40:focus,
 .app-style-98:focus {
-  --tw-ring-color: rgb(59 130 246 / 0.1);
+  --tw-ring-color: rgb(0 0 0 / 0.1);
 }
 
 .dialog-style-05:focus-visible,
@@ -2723,11 +2742,11 @@ img.received {
 .tabs-style-02:focus-visible,
 .app-style-09:focus-visible,
 .app-style-17:focus-visible {
-  --tw-ring-color: rgb(59 130 246 / 0.15);
+  --tw-ring-color: rgb(0 0 0 / 0.15);
 }
 
 .slider-style-04:focus-visible {
-  --tw-ring-color: rgb(59 130 246 / 0.2);
+  --tw-ring-color: rgb(0 0 0 / 0.2);
 }
 
 .slider-style-04:active {
@@ -2765,7 +2784,7 @@ img.received {
 }
 
 .app-style-17:hover .app-style-18 {
-  border-color: rgb(59 130 246 / 0.25);
+  border-color: rgb(0 0 0 / 0.25);
 }
 
 .dialog-style-02[data-state="closed"] {
@@ -3010,12 +3029,12 @@ img.received {
 }
 
 .checkbox-control[data-state="checked"] {
-  border-color: #2563eb;
-  background: #2563eb;
+  border-color: #000;
+  background: #000;
 }
 
 .checkbox-control:focus-visible {
-  box-shadow: 0 0 0 4px rgb(59 130 246 / 0.15);
+  box-shadow: 0 0 0 4px rgb(0 0 0 / 0.15);
 }
 
 .checkbox-control:disabled {

@@ -5,14 +5,15 @@
 
 /** What the no-signal hint tells the user to turn the sender down to. */
 export const NO_SIGNAL_HINT_FRAME_BYTES = 1465;
-export const NO_SIGNAL_HINT_TX_FPS = 24;
+export const NO_SIGNAL_HINT_TX_FPS = 60;
 
-/** Four independently decodable symbols are replaced on every display tick. */
+/** Four independently decodable symbols stay visible in the display grid. */
 export const QR_GRID_CELLS = 4;
 export const QR_SYMBOLS_PER_TICK = QR_GRID_CELLS;
 
-// Four moderate-density symbols at 30 display ticks/s previously sustained
-// materially higher camera goodput than one staggered symbol at 60 ticks/s.
+// Capable senders replace all four symbols at 30 display ticks/s. The stable
+// profile keeps the same moderate density but changes one cell at a time so a
+// constrained sender or VDI display does not have to repaint the whole grid.
 export const DEFAULT_TX_FPS = 30;
 export const DEFAULT_FRAME_BYTES = 1700;
 
@@ -20,13 +21,29 @@ export interface SendSpeedProfile {
   label: string;
   txFps: number;
   frameBytes: number;
+  symbolsPerTick: number;
 }
 
 /** One slider replaces independent settings that could form poor combinations. */
 export const SEND_SPEED_PROFILES: readonly SendSpeedProfile[] = [
-  { label: "稳定", txFps: NO_SIGNAL_HINT_TX_FPS, frameBytes: NO_SIGNAL_HINT_FRAME_BYTES },
-  { label: "平衡", txFps: DEFAULT_TX_FPS, frameBytes: DEFAULT_FRAME_BYTES },
-  { label: "高速", txFps: DEFAULT_TX_FPS, frameBytes: 2331 },
+  {
+    label: "稳定",
+    txFps: NO_SIGNAL_HINT_TX_FPS,
+    frameBytes: NO_SIGNAL_HINT_FRAME_BYTES,
+    symbolsPerTick: 1,
+  },
+  {
+    label: "平衡",
+    txFps: DEFAULT_TX_FPS,
+    frameBytes: DEFAULT_FRAME_BYTES,
+    symbolsPerTick: QR_SYMBOLS_PER_TICK,
+  },
+  {
+    label: "高速",
+    txFps: DEFAULT_TX_FPS,
+    frameBytes: 2331,
+    symbolsPerTick: QR_SYMBOLS_PER_TICK,
+  },
 ];
 
 export const DEFAULT_SPEED_PROFILE_INDEX = 1;
@@ -38,8 +55,8 @@ export const TX_FPS_OPTIONS: readonly number[] = [
   10,
   15,
   20,
-  NO_SIGNAL_HINT_TX_FPS,
   DEFAULT_TX_FPS,
+  NO_SIGNAL_HINT_TX_FPS,
 ];
 export const FRAME_BYTES_OPTIONS: readonly number[] = [
   500,

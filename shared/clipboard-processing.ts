@@ -1,6 +1,6 @@
 import { zip } from "fflate";
 
-import type { EncodedClipboardTransfer } from "./clipboard-transfer";
+import type { DecodedClipboardTransfer, EncodedClipboardTransfer } from "./clipboard-transfer";
 
 export interface ClipboardDirectoryEntry {
   readonly path: string;
@@ -19,11 +19,16 @@ export type ClipboardProcessingRequest =
   | {
       readonly type: "archive-directory";
       readonly entries: ClipboardDirectoryEntry[];
+    }
+  | {
+      readonly type: "decode";
+      readonly text: string;
     };
 
 export type ClipboardProcessingResponse =
   | { readonly type: "encoded"; readonly encoded: EncodedClipboardTransfer }
   | { readonly type: "archive"; readonly bytes: Uint8Array }
+  | { readonly type: "decoded"; readonly decoded: DecodedClipboardTransfer }
   | { readonly type: "error"; readonly message: string };
 
 export async function createClipboardDirectoryArchive(

@@ -1,5 +1,7 @@
 import { gzip as compressGzip } from "fflate";
 
+import { MAX_FILE_BYTES, MAX_FILE_LABEL } from "./protocol";
+
 export type ClipboardTransferItemType = "file" | "directory";
 export type ClipboardTextCodec = "base91";
 export type ClipboardCompression = "none" | "gzip";
@@ -21,6 +23,42 @@ export interface DecodedClipboardTransfer {
   codec: ClipboardTextCodec;
   compression: ClipboardCompression;
   sha256: string;
+}
+
+// A Base91 pair carries at least 13 bits. Keep a little metadata allowance for
+// protocol fields and percent-encoded filenames, then reject oversized text
+// before it is cloned into the processing Worker.
+export const MAX_BROWSER_RESTORE_TEXT_CHARACTERS =
+  Math.ceil(MAX_FILE_BYTES * 16 / 13) + 1024 * 1024;
+
+export function assertBrowserClipboardRestoreInput(text: string): void {
+  if (text.length > MAX_BROWSER_RESTORE_TEXT_CHARACTERS) {
+    throw new Error(`网页直接还原最大 ${MAX_FILE_LABEL}，请使用下方 BAT。`);
+  }
+
+  const value = text.trimStart();
+  if (!value.startsWith("ONE_TRANSFER_V2|")) {
+    throw new Error("剪贴板内容不是 ONE_TRANSFER_V2 数据。");
+  }
+  const separators: number[] = [];
+  let offset = 0;
+  for (let index = 0; index < 5; index++) {
+    const separator = value.indexOf("|", offset);
+    if (separator < 0) throw new Error("剪贴板内容不是 ONE_TRANSFER_V2 数据。");
+    separators.push(separator);
+    offset = separator + 1;
+  }
+  const originalSize = Number(value.slice(separators[3]! + 1, separators[4]));
+  if (!Number.isSafeInteger(originalSize) || originalSize < 0) {
+    throw new Error("原始文件大小无效。");
+  }
+  if (originalSize > MAX_FILE_BYTES) {
+    throw new Error(`网页直接还原最大 ${MAX_FILE_LABEL}，请使用下方 BAT。`);
+  }
+}
+
+export function clipboardDownloadFileName(itemType: ClipboardTransferItemType, name: string): string {
+  return itemType === "directory" ? `${name}.zip` : name;
 }
 
 const BASE64_CHUNK_SIZE = 0x8000;
@@ -93,6 +131,7 @@ export async function encodeClipboardTransfer(
 }
 
 export async function decodeClipboardTransfer(text: string): Promise<DecodedClipboardTransfer> {
+  assertBrowserClipboardRestoreInput(text);
   const parts = splitFields(text.trim(), 8);
   if (parts.length !== 8 || parts[0] !== "ONE_TRANSFER_V2") {
     throw new Error("剪贴板内容不是 ONE_TRANSFER_V2 数据。");
@@ -153,7 +192,8 @@ export function decodeBase91(text: string): Uint8Array {
   let queue = 0;
   let queuedBits = 0;
   let value = -1;
-  const output: number[] = [];
+  const output = new Uint8Array(Math.ceil(text.length * 7 / 8));
+  let outputLength = 0;
   for (const character of text) {
     const decoded = BASE91_LOOKUP.get(character);
     if (decoded === undefined) throw new Error(`无法识别的 Base91 字符：${character}`);
@@ -165,14 +205,14 @@ export function decodeBase91(text: string): Uint8Array {
     queue |= value << queuedBits;
     queuedBits += (value & 8191) > 88 ? 13 : 14;
     while (queuedBits >= 8) {
-      output.push(queue & 0xff);
+      output[outputLength++] = queue & 0xff;
       queue >>= 8;
       queuedBits -= 8;
     }
     value = -1;
   }
-  if (value >= 0) output.push((queue | value << queuedBits) & 0xff);
-  return Uint8Array.from(output);
+  if (value >= 0) output[outputLength++] = (queue | value << queuedBits) & 0xff;
+  return output.slice(0, outputLength);
 }
 
 function gzip(bytes: Uint8Array): Promise<Uint8Array> {
@@ -186,9 +226,28 @@ function gzip(bytes: Uint8Array): Promise<Uint8Array> {
 
 async function gunzip(bytes: Uint8Array, expectedSize: number): Promise<Uint8Array> {
   if (typeof DecompressionStream === "undefined") throw new Error("当前环境不支持 gzip 解压。");
-  const stream = new Blob([bytes as BlobPart]).stream().pipeThrough(new DecompressionStream("gzip"));
-  const output = new Uint8Array(await new Response(stream).arrayBuffer());
-  if (output.length > expectedSize) throw new Error("gzip 解压结果超过声明大小。");
+  const stream = new Blob([bytes as BlobPart])
+    .stream()
+    .pipeThrough(new DecompressionStream("gzip"));
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.length;
+    if (total > expectedSize) {
+      await reader.cancel();
+      throw new Error("gzip 解压结果超过声明大小。");
+    }
+    chunks.push(value);
+  }
+  const output = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    output.set(chunk, offset);
+    offset += chunk.length;
+  }
   return output;
 }
 

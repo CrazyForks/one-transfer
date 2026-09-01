@@ -31,6 +31,41 @@ function ClipboardDirectoryActions({
   );
 }
 
+function BrowserRestorePanel() {
+  return (
+    <Card id="browser-restore-panel" data-reveal className="app-style-94">
+      <CardContent className="app-style-95">
+        <div className="app-style-96">
+          <span className="app-style-97">WINDOWS 接收端 · 无需脚本</span>
+          <strong>浏览器直接还原</strong>
+          <span className="dialog-style-11">
+            点击后读取当前 ONE_TRANSFER_V2 文本剪贴板，校验通过后直接下载；文件夹会下载为 ZIP，
+            网页直接还原最大 64 MB。
+          </span>
+        </div>
+        <div id="browser-restore-status" className="app-style-102" aria-live="polite">
+          等待读取当前 V2 剪贴板数据
+        </div>
+        <div className="app-style-100">
+          <Button id="restore-from-clipboard" type="button">
+            <ClipboardPaste /><span id="restore-from-clipboard-label">读取剪贴板并下载</span>
+          </Button>
+          <span id="browser-restore-download-wrap" hidden>
+            <a
+              id="browser-restore-download"
+              href="#browser-restore-panel"
+              className={buttonVariants({ variant: "outline" })}
+            >
+              <Download /><span>再次下载</span>
+            </a>
+          </span>
+        </div>
+        <span className="dialog-style-11">如浏览器或内网策略不允许读取剪贴板，请使用下方 BAT 备用方式。</span>
+      </CardContent>
+    </Card>
+  );
+}
+
 function RestoreScriptPanel() {
   const [script, setScript] = useState("");
   const [copyLabel, setCopyLabel] = useState("复制脚本源码");
@@ -71,7 +106,7 @@ function RestoreScriptPanel() {
     <Card id="restore-script-panel" data-reveal className="app-style-94">
       <CardContent className="app-style-95">
         <div className="app-style-96">
-          <span className="app-style-97">WINDOWS 接收端 · 首次使用</span>
+          <span className="app-style-97">WINDOWS 接收端 · 备用方式</span>
           <strong>One Transfer 通用还原脚本</strong>
           <span className="dialog-style-11">下载脚本，或复制下方源码并保存为 one-transfer-restore.bat；兼容 V1/V2。</span>
         </div>
@@ -134,13 +169,14 @@ export function ClipboardPage() {
         <strong className="app-style-105">复制成功，下一步到 Windows 恢复</strong>
         <ol className="app-style-106">
           <li><b>1.</b> 切换到 Windows，等待远程剪贴板同步完成。</li>
-          <li><b>2.</b> 将下方的 <code>one-transfer-restore.bat</code> 放到希望保存文件的目录。</li>
-          <li><b>3.</b> 双击运行脚本；脚本会读取剪贴板、校验数据并恢复文件，文件夹会自动解压。</li>
+          <li><b>2.</b> 在 Windows 浏览器打开本页，点击“读取剪贴板并下载”。</li>
+          <li><b>3.</b> 文件夹会下载为 ZIP；如浏览器拒绝剪贴板权限，使用下方 BAT 恢复。</li>
         </ol>
-        <a href="#restore-script-panel" className="app-style-107">
-          查看或下载 Windows 还原脚本
+        <a href="#browser-restore-panel" className="app-style-107">
+          前往浏览器直接还原
         </a>
       </section>
+      <BrowserRestorePanel />
       <RestoreScriptPanel />
     </main>
   );

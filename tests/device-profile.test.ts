@@ -26,6 +26,16 @@ test("a normal laptop receives the balanced profile", () => {
   }).profileIndex, 1);
 });
 
+test("a four-thread large-screen sender still receives the stable profile", () => {
+  assert.equal(recommendSpeedProfile({
+    logicalCores: 4,
+    deviceMemoryGiB: 16,
+    refreshRateHz: 60,
+    shortViewportEdge: 1600,
+    devicePixelRatio: 1,
+  }).profileIndex, 0);
+});
+
 test("small or constrained devices fall back to stable", () => {
   assert.equal(recommendSpeedProfile({
     logicalCores: 8,

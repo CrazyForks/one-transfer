@@ -2,6 +2,7 @@ import { ChevronRight, ClipboardPaste, ScanLine, Upload } from "lucide-react";
 import { Link, useOutletContext } from "react-router-dom";
 
 import { Card, CardContent } from "@/components/ui/card";
+import { BrandMark } from "@/components/brand-mark";
 import { handleRouteClick, type RouteOutletContext } from "@/app/navigation";
 
 const transferCards = [
@@ -18,6 +19,7 @@ function HomeView({ transitionTo }: { transitionTo: (to: string) => void }) {
       className="app-style-12"
     >
       <section data-reveal className="app-style-13">
+        <BrandMark className="brand-mark brand-mark--hero" />
         <h1 className="app-style-14">One Transfer</h1>
         <p data-breathe className="app-style-15">用光传递数据</p>
       </section>

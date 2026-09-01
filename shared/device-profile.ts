@@ -43,7 +43,7 @@ export function recommendSpeedProfile(capabilities: DeviceCapabilities): SpeedRe
   const refreshSupportsBalanced =
     capabilities.refreshRateHz === undefined || capabilities.refreshRateHz >= 45;
   if (
-    capabilities.logicalCores >= 4 &&
+    capabilities.logicalCores >= 6 &&
     memorySupportsBalanced &&
     refreshSupportsBalanced &&
     physicalShortEdge >= 1200

@@ -3,20 +3,33 @@ import test from "node:test";
 import { unzipSync } from "fflate";
 import {
   createSourceArchive,
+  createSourceArchiveFromSelection,
   decideSourcePath,
+  prepareSourceArchiveSelection,
   type BrowserSourceFile,
 } from "../shared/source-archive.ts";
 
-function sourceFile(path: string, content: string): BrowserSourceFile {
+function sourceFile(
+  path: string,
+  content: string,
+  onRead: () => void = () => undefined,
+): BrowserSourceFile {
   const bytes = new TextEncoder().encode(content);
   return {
     name: path.split("/").at(-1)!,
     size: bytes.length,
     webkitRelativePath: path,
     async arrayBuffer() {
+      onRead();
       return bytes.slice().buffer;
     },
   };
+}
+
+function asArrayLike<T>(items: readonly T[]): ArrayLike<T> {
+  const input: { length: number; [index: number]: T } = { length: items.length };
+  items.forEach((item, index) => { input[index] = item; });
+  return input;
 }
 
 test("frontend and Python project paths can use any root directory name", () => {
@@ -78,4 +91,100 @@ test("source archive keeps one project root and only included code", async () =>
     "gttk-fm-agent-web/package.json",
     "gttk-fm-agent-web/src/main.tsx",
   ]);
+});
+
+test("large dependency trees are filtered in yielding chunks before any file bytes are read", async () => {
+  const dependencyCount = 4_000;
+  let includedReads = 0;
+  let excludedReads = 0;
+  let yieldCount = 0;
+  const progress: number[] = [];
+  const files: BrowserSourceFile[] = [
+    sourceFile("large-web/package.json", "{}", () => { includedReads++; }),
+    ...Array.from({ length: dependencyCount }, (_, index) => ({
+      name: "index.js",
+      size: 32,
+      webkitRelativePath: `large-web/node_modules/package-${index}/index.js`,
+      async arrayBuffer() {
+        excludedReads++;
+        throw new Error("excluded dependency bytes must not be read");
+      },
+    })),
+    sourceFile("large-web/src/main.ts", "export const ready = true;", () => { includedReads++; }),
+  ];
+
+  const input = asArrayLike(files);
+  const selection = await prepareSourceArchiveSelection(
+    input,
+    (next) => progress.push(next.percent),
+    {},
+    {
+      yieldControl: async () => {
+        yieldCount++;
+      },
+    },
+  );
+
+  assert.equal(selection.included.length, 2);
+  assert.deepEqual(selection.included.map(({ path }) => path).sort(), [
+    "large-web/package.json",
+    "large-web/src/main.ts",
+  ]);
+  assert.equal(selection.excludedFileCount, dependencyCount);
+  assert.equal(excludedReads, 0);
+  assert.equal(includedReads, 0);
+  assert.equal(yieldCount, Math.ceil(input.length / 500) + 1);
+  assert.equal(progress[0], 2);
+  assert.equal(progress.at(-1), 32);
+  assert.ok(
+    progress.every((percent, index) => index === 0 || percent > progress[index - 1]!),
+    `progress must increase after every chunk: ${progress.join(", ")}`,
+  );
+
+  const archive = await createSourceArchiveFromSelection(selection, 1024 * 1024);
+  assert.equal(excludedReads, 0);
+  assert.equal(includedReads, 2);
+  assert.equal(archive.includedFileCount, 2);
+  assert.equal(archive.excludedFileCount, dependencyCount);
+  assert.deepEqual(Object.keys(unzipSync(archive.bytes)).sort(), [
+    "large-web/package.json",
+    "large-web/src/main.ts",
+  ]);
+});
+
+test("source selection stops at a chunk boundary when aborted", async () => {
+  const controller = new AbortController();
+  let readCount = 0;
+  let yieldCount = 0;
+  const progress: number[] = [];
+  const files: BrowserSourceFile[] = [
+    sourceFile("aborted-web/package.json", "{}", () => { readCount++; }),
+    ...Array.from({ length: 3_000 }, (_, index) => sourceFile(
+      `aborted-web/node_modules/package-${index}/index.js`,
+      "dependency",
+      () => { readCount++; },
+    )),
+    sourceFile("aborted-web/src/main.ts", "export {};", () => { readCount++; }),
+  ];
+
+  await assert.rejects(
+    prepareSourceArchiveSelection(
+      files,
+      (next) => progress.push(next.percent),
+      {},
+      {
+        signal: controller.signal,
+        yieldControl: async () => {
+          yieldCount++;
+          if (yieldCount === 2) controller.abort();
+        },
+      },
+    ),
+    (error: unknown) => error instanceof DOMException && error.name === "AbortError",
+  );
+
+  assert.equal(yieldCount, 2);
+  assert.equal(readCount, 0);
+  assert.ok(progress.at(-1)! < 30);
+  assert.equal(progress.includes(32), false);
 });
