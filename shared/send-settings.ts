@@ -60,6 +60,14 @@ export function normalizeSendTuning(tuning: SendTuning): SendTuning {
   };
 }
 
+export function isSameSendTuning(left: SendTuning, right: SendTuning): boolean {
+  const normalizedLeft = normalizeSendTuning(left);
+  const normalizedRight = normalizeSendTuning(right);
+  return normalizedLeft.txFps === normalizedRight.txFps &&
+    normalizedLeft.frameBytes === normalizedRight.frameBytes &&
+    normalizedLeft.symbolsPerTick === normalizedRight.symbolsPerTick;
+}
+
 /** One slider replaces independent settings that could form poor combinations. */
 export const SEND_SPEED_PROFILES: readonly SendSpeedProfile[] = [
   {

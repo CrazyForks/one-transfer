@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { ClipboardPaste, Download, FolderOpen } from "lucide-react";
 
-import { PAGE_HEADING, VIEW_SHELL } from "@/app/constants";
 import { SourceArchiveProgressDialog } from "@/components/source-archive-progress-dialog";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { FileSelectPanel } from "@/routes/components/file-select-panel";
+import { FileSelectPanel } from "@/app/components/file-select-panel";
 
 function ClipboardDirectoryActions({
   directoryInputId,
@@ -31,6 +31,61 @@ function ClipboardDirectoryActions({
   );
 }
 
+export function ClipboardSendPanel() {
+  return (
+    <div className="transfer-channel-panel">
+      <section data-reveal className="transfer-tool-surface">
+        <h2 className="dialog-style-07">剪贴板发送</h2>
+        <header className="transfer-tool-header">
+          <span className="transfer-tool-copy">
+            <strong>剪贴板发送</strong>
+            <span>编码为文本，文件夹自动打包并保留层级</span>
+          </span>
+        </header>
+        <div className="app-style-102" id="clipboard-status" aria-live="polite">
+          请选择要传递的文件或文件夹
+        </div>
+        <FileSelectPanel
+          inputId="clipboard-file"
+          directoryInputId="clipboard-directory"
+          projectDirectoryInputId="clipboard-project-directory"
+          description="选择文件、文件夹或工程"
+          className="file-select-panel--embedded"
+          directoryControl={(
+            <ClipboardDirectoryActions
+              directoryInputId="clipboard-directory"
+              projectDirectoryInputId="clipboard-project-directory"
+            />
+          )}
+          fileNameId="clipboard-file-name"
+        />
+        <div className="app-style-103">
+          <Button id="copy-transfer" type="button" disabled>复制数据到剪贴板</Button>
+          <span className="dialog-style-11">
+            选择后自动复制；工程会自动排除依赖和构建产物。
+          </span>
+        </div>
+        <section
+          id="clipboard-next-step"
+          hidden
+          aria-live="polite"
+          className="app-style-104"
+        >
+          <strong className="app-style-105">复制成功，下一步到 Windows 接收</strong>
+          <ol className="app-style-106">
+            <li><b>1.</b> 切换到 Windows，等待远程剪贴板同步完成。</li>
+            <li><b>2.</b> 打开 One Transfer 的“接收 → 剪贴板”。</li>
+            <li><b>3.</b> 点击“读取剪贴板并下载”；文件夹会下载为 ZIP。</li>
+          </ol>
+          <Link to="/receive?channel=clipboard" className="app-style-107">
+            前往剪贴板接收
+          </Link>
+        </section>
+      </section>
+    </div>
+  );
+}
+
 function BrowserRestorePanel() {
   return (
     <Card id="browser-restore-panel" data-reveal className="app-style-94">
@@ -39,7 +94,7 @@ function BrowserRestorePanel() {
           <span className="app-style-97">WINDOWS 接收端 · 无需脚本</span>
           <strong>浏览器直接还原</strong>
           <span className="dialog-style-11">
-            点击后读取当前 ONE_TRANSFER_V2 文本剪贴板，校验通过后直接下载；文件夹会下载为 ZIP，
+            读取当前 ONE_TRANSFER_V2 文本剪贴板，校验通过后直接下载；文件夹会下载为 ZIP，
             网页直接还原最大 64 MB。
           </span>
         </div>
@@ -135,49 +190,11 @@ function RestoreScriptPanel() {
   );
 }
 
-export function ClipboardPage() {
+export function ClipboardReceivePanel() {
   return (
-    <main data-route-page data-view="clipboard" className={VIEW_SHELL}>
-      <section data-reveal className="app-style-101">
-        <h1 className={PAGE_HEADING}>通过文本剪贴板传文件或文件夹</h1>
-        <p data-breathe className="app-style-35">文件夹会包含全部文件和层级，自动打包后复制到 Windows 还原。</p>
-      </section>
-      <div className="app-style-102" id="clipboard-status" aria-live="polite">请选择要传递的文件或文件夹</div>
-      <FileSelectPanel
-        inputId="clipboard-file"
-        directoryInputId="clipboard-directory"
-        projectDirectoryInputId="clipboard-project-directory"
-        description="发送端 · 选择文件、文件夹或工程"
-        directoryControl={(
-          <ClipboardDirectoryActions
-            directoryInputId="clipboard-directory"
-            projectDirectoryInputId="clipboard-project-directory"
-          />
-        )}
-        fileNameId="clipboard-file-name"
-      />
-      <div data-reveal className="app-style-103">
-        <Button id="copy-transfer" type="button" disabled>复制数据到剪贴板</Button>
-        <span className="dialog-style-11">选择后自动复制；完整文件夹保留全部内容，工程会自动排除依赖和构建产物。</span>
-      </div>
-      <section
-        id="clipboard-next-step"
-        hidden
-        aria-live="polite"
-        className="app-style-104"
-      >
-        <strong className="app-style-105">复制成功，下一步到 Windows 恢复</strong>
-        <ol className="app-style-106">
-          <li><b>1.</b> 切换到 Windows，等待远程剪贴板同步完成。</li>
-          <li><b>2.</b> 在 Windows 浏览器打开本页，点击“读取剪贴板并下载”。</li>
-          <li><b>3.</b> 文件夹会下载为 ZIP；如浏览器拒绝剪贴板权限，使用下方 BAT 恢复。</li>
-        </ol>
-        <a href="#browser-restore-panel" className="app-style-107">
-          前往浏览器直接还原
-        </a>
-      </section>
+    <div className="transfer-channel-panel">
       <BrowserRestorePanel />
       <RestoreScriptPanel />
-    </main>
+    </div>
   );
 }

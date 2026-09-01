@@ -1,13 +1,10 @@
 import {
-  assertBrowserClipboardRestoreInput,
-  clipboardDownloadFileName,
   isValidWindowsFileName,
   type ClipboardTextCodec,
   type EncodedClipboardTransfer,
 } from "../shared/clipboard-transfer";
 import {
   createClipboardDirectoryArchiveInWorker,
-  decodeClipboardTransferInWorker,
   encodeClipboardTransferInWorker,
 } from "../shared/clipboard-processing-client";
 import { formatBytes } from "../shared/format";
@@ -22,7 +19,7 @@ import {
   type SourceArchiveProgressDetail,
 } from "../shared/source-archive-events";
 
-export function mountClipboard() {
+export function mountClipboardSend() {
 const fileInput = document.getElementById("clipboard-file") as HTMLInputElement;
 const directoryInput = document.getElementById("clipboard-directory") as HTMLInputElement;
 const projectDirectoryInput = document.getElementById("clipboard-project-directory") as HTMLInputElement;
@@ -30,11 +27,6 @@ const copyButton = document.getElementById("copy-transfer") as HTMLButtonElement
 const fileNameLabel = document.getElementById("clipboard-file-name")!;
 const nextStep = document.getElementById("clipboard-next-step") as HTMLElement;
 const status = statusLine(document.getElementById("clipboard-status")!);
-const browserRestoreButton = document.getElementById("restore-from-clipboard") as HTMLButtonElement;
-const browserRestoreButtonLabel = document.getElementById("restore-from-clipboard-label")!;
-const browserRestoreStatus = statusLine(document.getElementById("browser-restore-status")!);
-const browserRestoreDownloadWrap = document.getElementById("browser-restore-download-wrap")!;
-const browserRestoreDownload = document.getElementById("browser-restore-download") as HTMLAnchorElement;
 const toast = document.createElement("div");
 toast.className = "clipboard-toast";
 toast.setAttribute("role", "status");
@@ -47,8 +39,6 @@ let selectedName = "";
 let generation = 0;
 let processingAbortController: AbortController | null = null;
 let sourceArchiveDownloadUrl: string | null = null;
-let browserRestoreAbortController: AbortController | null = null;
-let browserRestoreDownloadUrl: string | null = null;
 let sourceArchiveOptions: SourceArchiveOptionsDetail = { includeGit: false };
 let selected: {
   itemType: "file" | "directory";
@@ -83,80 +73,6 @@ function revokeSourceArchiveDownload(): void {
   if (!sourceArchiveDownloadUrl) return;
   URL.revokeObjectURL(sourceArchiveDownloadUrl);
   sourceArchiveDownloadUrl = null;
-}
-
-function revokeBrowserRestoreDownload(): void {
-  if (browserRestoreDownloadUrl) URL.revokeObjectURL(browserRestoreDownloadUrl);
-  browserRestoreDownloadUrl = null;
-  browserRestoreDownload.removeAttribute("href");
-  browserRestoreDownload.removeAttribute("download");
-  browserRestoreDownloadWrap.hidden = true;
-}
-
-function browserRestoreErrorMessage(error: unknown): string {
-  if (error instanceof DOMException && error.name === "NotAllowedError") {
-    return "浏览器未允许读取剪贴板。请在地址栏的站点权限中允许剪贴板后重试，或使用下方 BAT。";
-  }
-  if (error instanceof DOMException && error.name === "NotFoundError") {
-    return "剪贴板中没有可读取的文本，请重新复制当前 V2 数据。";
-  }
-  const message = error instanceof Error ? error.message : "剪贴板还原失败。";
-  if (message.includes("下方 BAT")) return message;
-  if (message.includes("ONE_TRANSFER_V2")) {
-    return `${message} 当前网页只还原 V2；旧 V1 数据请使用下方 BAT。`;
-  }
-  return `${message} 请重新复制当前 V2 数据；如仍失败，请使用下方 BAT。`;
-}
-
-async function restoreFromBrowserClipboard(): Promise<void> {
-  browserRestoreAbortController?.abort();
-  const controller = new AbortController();
-  browserRestoreAbortController = controller;
-  revokeBrowserRestoreDownload();
-  browserRestoreButton.disabled = true;
-  browserRestoreButtonLabel.textContent = "正在读取剪贴板…";
-  browserRestoreStatus.showLoading("正在请求剪贴板读取权限…");
-
-  try {
-    if (!window.isSecureContext) {
-      throw new Error("浏览器只允许 HTTPS 页面读取剪贴板，请打开正式 HTTPS 地址或使用下方 BAT。");
-    }
-    const clipboard = navigator.clipboard;
-    if (!clipboard?.readText) {
-      throw new Error("当前浏览器不支持读取文本剪贴板，请使用新版 Edge/Chrome 或下方 BAT。");
-    }
-
-    const text = await clipboard.readText();
-    if (controller.signal.aborted) return;
-    if (!text.trim()) throw new Error("剪贴板为空，请重新复制当前 V2 数据。");
-    assertBrowserClipboardRestoreInput(text);
-
-    browserRestoreButtonLabel.textContent = "正在校验 V2 数据…";
-    browserRestoreStatus.showLoading("正在 Worker 中解码、解压并校验 SHA-256…");
-    const decoded = await decodeClipboardTransferInWorker(text, controller.signal);
-    if (controller.signal.aborted) return;
-
-    const fileName = clipboardDownloadFileName(decoded.itemType, decoded.name);
-    const mediaType = decoded.itemType === "directory" ? "application/zip" : "application/octet-stream";
-    const url = URL.createObjectURL(new Blob([decoded.bytes as BlobPart], { type: mediaType }));
-    browserRestoreDownloadUrl = url;
-    browserRestoreDownload.href = url;
-    browserRestoreDownload.download = fileName;
-    browserRestoreDownloadWrap.hidden = false;
-    browserRestoreDownload.click();
-    browserRestoreStatus.setStatus(
-      `${fileName} · ${formatBytes(decoded.bytes.length)} · SHA-256 校验通过，已开始下载`,
-    );
-  } catch (error) {
-    if (controller.signal.aborted) return;
-    browserRestoreStatus.showError(browserRestoreErrorMessage(error));
-  } finally {
-    if (browserRestoreAbortController === controller) {
-      browserRestoreAbortController = null;
-      browserRestoreButton.disabled = false;
-      browserRestoreButtonLabel.textContent = "读取剪贴板并下载";
-    }
-  }
 }
 
 function clearClipboardSelection(preserveArchiveDialog = false): void {
@@ -502,7 +418,7 @@ async function copyTransfer(
     if (expectedGeneration !== generation) return;
     status.setStatus(
       `${name} ${automatic ? "已自动复制" : "已复制"}。下一步：切换到 Windows，` +
-        "等待剪贴板同步后在本页点击“读取剪贴板并下载”；BAT 作为备用方式",
+        "等待剪贴板同步后打开“接收 → 剪贴板”并下载；BAT 作为备用方式",
     );
     copyButton.textContent = automatic ? "已自动复制 · 再次复制" : "已复制 · 再次复制";
     nextStep.hidden = false;
@@ -532,15 +448,12 @@ fileInput.addEventListener("change", () => void prepareFile());
 directoryInput.addEventListener("change", () => void prepareDirectory());
 projectDirectoryInput.addEventListener("change", () => void prepareProjectDirectory());
 copyButton.addEventListener("click", () => void copyTransfer());
-browserRestoreButton.addEventListener("click", () => void restoreFromBrowserClipboard());
 window.addEventListener(SOURCE_ARCHIVE_OPTIONS_EVENT, onSourceArchiveOptions);
 window.addEventListener(SOURCE_ARCHIVE_COPY_EVENT, onSourceArchiveCopy);
 window.addEventListener(SOURCE_ARCHIVE_CLEAR_EVENT, onSourceArchiveClear);
 return () => {
   processingAbortController?.abort();
   processingAbortController = null;
-  browserRestoreAbortController?.abort();
-  browserRestoreAbortController = null;
   generation++;
   clearTimeout(toastTimer);
   toast.remove();
@@ -550,7 +463,6 @@ return () => {
   window.removeEventListener(SOURCE_ARCHIVE_COPY_EVENT, onSourceArchiveCopy);
   window.removeEventListener(SOURCE_ARCHIVE_CLEAR_EVENT, onSourceArchiveClear);
   revokeSourceArchiveDownload();
-  revokeBrowserRestoreDownload();
   reportSourceArchive({ state: "idle", percent: 0, message: "" });
 };
 }

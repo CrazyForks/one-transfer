@@ -1,4 +1,4 @@
-import { ChevronRight, ClipboardPaste, ScanLine, Upload } from "lucide-react";
+import { ChevronRight, ScanLine, Upload } from "lucide-react";
 import { Link, useOutletContext } from "react-router-dom";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -6,9 +6,8 @@ import { BrandMark } from "@/components/brand-mark";
 import { handleRouteClick, type RouteOutletContext } from "@/app/navigation";
 
 const transferCards = [
-  { to: "/send", title: "发送", description: "播放文件或文字二维码", icon: Upload },
-  { to: "/receive", title: "接收", description: "扫描屏幕或使用相机", icon: ScanLine },
-  { to: "/clipboard", title: "剪贴板", description: "用文本剪贴板传递文件数据", icon: ClipboardPaste },
+  { to: "/send", title: "发送", description: "通过二维码或剪贴板传输", icon: Upload },
+  { to: "/receive", title: "接收", description: "扫描二维码或读取剪贴板", icon: ScanLine },
 ] as const;
 
 function HomeView({ transitionTo }: { transitionTo: (to: string) => void }) {

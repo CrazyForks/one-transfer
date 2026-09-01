@@ -51,9 +51,8 @@ function Header({ route, transitionTo }: { route: RouteKey; transitionTo: Transi
       <nav className="app-style-07" aria-label="功能切换">
         <NavLink to="/send" className={navClass} onClick={(event) => handleRouteClick(event, "/send", transitionTo)}>发送</NavLink>
         <NavLink to="/receive" className={navClass} onClick={(event) => handleRouteClick(event, "/receive", transitionTo)}>接收</NavLink>
-        <NavLink to="/clipboard" className={navClass} onClick={(event) => handleRouteClick(event, "/clipboard", transitionTo)}>剪贴板</NavLink>
       </nav>
-      <BrandMark className="brand-mark brand-mark--header" />
+      <span aria-hidden="true" />
     </header>
   );
 }

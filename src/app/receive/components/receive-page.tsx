@@ -4,13 +4,18 @@ import { Settings2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { PAGE_HEADING, VIEW_SHELL } from "@/app/constants";
+import { ClipboardReceivePanel } from "@/app/components/clipboard-panels";
+import {
+  TransferChannelTabs,
+  type TransferChannel,
+} from "@/app/components/transfer-channel-tabs";
 import {
   RECEIVE_CAPTURE_CLOSE_EVENT,
   RECEIVE_CAPTURE_START_EVENT,
   type ReceiveCaptureSource,
 } from "../../../../shared/receive-events";
 
-export function ReceivePage() {
+function QrReceivePanel() {
   const [captureOpen, setCaptureOpen] = useState(false);
   const [captureSettingsOpen, setCaptureSettingsOpen] = useState(false);
 
@@ -37,12 +42,14 @@ export function ReceivePage() {
   };
 
   return (
-    <main data-route-page data-view="receive" className={VIEW_SHELL}>
-      <section className="receiver-primary">
-        <div data-reveal className="app-style-73">
-          <h1 data-breathe className={PAGE_HEADING}>接收</h1>
-          <p className="app-style-35">选择扫描方式后，在全屏窗口中查看画面和接收进度。</p>
-        </div>
+    <section className="receiver-primary transfer-channel-panel transfer-tool-surface">
+        <header data-reveal className="transfer-tool-header">
+          <h2 className="dialog-style-07">二维码接收</h2>
+          <span className="transfer-tool-copy">
+            <strong>二维码接收</strong>
+            <span>选择扫描来源，在全屏窗口查看接收进度</span>
+          </span>
+        </header>
         <div data-reveal className="app-style-74" id="capture-actions">
           <Button id="start" type="button" className="app-style-75" onClick={() => startCapture("screen")}>扫描电脑屏幕</Button>
           <Button id="start-camera" type="button" variant="outline" onClick={() => startCapture("camera")}>使用相机</Button>
@@ -128,7 +135,29 @@ export function ReceivePage() {
               <div id="result" />
             </div>
         </div>, document.body)}
+    </section>
+  );
+}
+
+export function ReceivePage({
+  channel,
+  onChannelChange,
+}: {
+  channel: TransferChannel;
+  onChannelChange: (channel: TransferChannel) => void;
+}) {
+  return (
+    <main data-route-page data-view="receive" className={VIEW_SHELL}>
+      <section data-reveal className="transfer-page-heading">
+        <h1 className={PAGE_HEADING}>接收</h1>
+        <p className="app-style-35">选择二维码或剪贴板通道接收文件和文字。</p>
       </section>
+      <TransferChannelTabs
+        channel={channel}
+        onChannelChange={onChannelChange}
+        qr={<QrReceivePanel />}
+        clipboard={<ClipboardReceivePanel />}
+      />
     </main>
   );
 }

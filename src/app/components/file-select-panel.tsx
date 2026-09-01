@@ -11,6 +11,7 @@ export function FileSelectPanel({
   projectDirectoryInputId,
   descriptionId,
   description,
+  className,
   directoryControl,
   directoryLabel = "选择文件夹",
   fileNameId,
@@ -21,6 +22,7 @@ export function FileSelectPanel({
   projectDirectoryInputId?: string;
   descriptionId?: string;
   description: string;
+  className?: string;
   directoryControl?: React.ReactNode;
   directoryLabel?: string;
   fileNameId: string;
@@ -29,7 +31,7 @@ export function FileSelectPanel({
     <div
       data-reveal
       id={panelId}
-      className="app-style-27"
+      className={cn("app-style-27", className)}
     >
       <strong id={descriptionId} className="app-style-28">{description}</strong>
       <div className="app-style-29">
