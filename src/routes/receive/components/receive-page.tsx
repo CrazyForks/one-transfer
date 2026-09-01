@@ -78,7 +78,7 @@ export function ReceivePage() {
               <strong>解码设置</strong>
               <div className="receive-settings-fields">
                 <label>解码宽度<select id="cfg-width" defaultValue="1280"><option>960</option><option>1280</option><option>1920</option></select></label>
-                <label>捕获 FPS<select id="cfg-capfps" defaultValue="60"><option>30</option><option>60</option></select></label>
+                <label>捕获 FPS<select id="cfg-capfps" defaultValue="60"><option>30</option><option>45</option><option>60</option></select></label>
                 <label>Worker数<select id="cfg-workers" defaultValue="2"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
               </div>
               <div className="receive-secondary-metrics">
@@ -102,6 +102,19 @@ export function ReceivePage() {
               </div>
             </div>
             <div className="app-style-84 receive-controls-panel">
+              <section id="link-calibration" className="receive-link-calibration" hidden aria-live="polite">
+                <div className="receive-link-calibration-header">
+                  <strong>设备动态匹配</strong>
+                  <span id="link-calibration-status">等待发送端能力信息</span>
+                </div>
+                <div className="receive-link-calibration-grid">
+                  <span>发送端 <strong id="link-sender-info">—</strong></span>
+                  <span>接收端 <strong id="link-receiver-info">—</strong></span>
+                </div>
+                <div id="link-sender-recommendation" className="receive-link-recommendation">
+                  收到能力信息后给出发送端数字建议
+                </div>
+              </section>
               <div className="transfer-hud">
                 <div className="progress" id="progress" style={{ display: "none" }} role="progressbar" aria-label="接收进度" aria-valuemin={0} aria-valuemax={100} aria-valuenow={0}><div id="bar" /></div>
                 <div className="progress-status" id="progress-status" style={{ display: "none" }} aria-live="polite">

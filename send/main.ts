@@ -23,6 +23,7 @@ import {
   blockLength,
   fitsInOneStream,
   maximumFileBytes,
+  minimumFrameBytes,
   sourceBlockCount,
 } from "../shared/frame-capacity";
 import { LTEncoder } from "../shared/fountain";
@@ -38,20 +39,25 @@ import { statusLine } from "../shared/status-line";
 import { requestScreenWakeLock } from "../shared/wake-lock";
 import { expectedFountainOverhead } from "../shared/progress";
 import {
+  SEND_CAPABILITIES_EVENT,
   SEND_PROGRESS_EVENT,
   isSendProgressReportDue,
+  type SenderCapabilitiesDetail,
   type SendProgressDetail,
 } from "../shared/send-events";
 import {
-  DEFAULT_SPEED_PROFILE_INDEX,
+  DEFAULT_SEND_TUNING,
   QR_GRID_CELLS,
   SEND_SPEED_CHANGE_EVENT,
   SEND_SPEED_SYNC_EVENT,
-  SEND_SPEED_PROFILES,
+  SEND_TUNING_LIMITS,
+  normalizeSendTuning,
+  type SendTuning,
 } from "../shared/send-settings";
 import { createSourceArchiveInWorker } from "../shared/source-archive-client";
 import { createClipboardDirectoryArchiveInWorker } from "../shared/clipboard-processing-client";
 import { isValidWindowsFileName } from "../shared/clipboard-transfer";
+import { packSenderCapabilityHello } from "../shared/link-calibration";
 import {
   SOURCE_ARCHIVE_PROGRESS_EVENT,
   SOURCE_ARCHIVE_CLEAR_EVENT,
@@ -63,6 +69,9 @@ import {
 
 const MARGIN = 4; // quiet-zone modules
 const LOOKAHEAD_SYMBOLS = 8;
+const CAPABILITY_PREAMBLE_MS = 1500;
+const CAPABILITY_REPEAT_INTERVAL_MS = 10_000;
+const CAPABILITY_REPEAT_BURST_MS = 500;
 
 export function mountSend() {
 const qrGrid = document.getElementById("qr-grid") as HTMLDivElement;
@@ -102,17 +111,30 @@ const qrResizeObserver = typeof ResizeObserver === "undefined"
   ? null
   : new ResizeObserver(() => resizeDisplay?.());
 qrResizeObserver?.observe(qrDisplayArea);
-const initialSpeedProfileIndex = Number(cfgSpeed.dataset.speedIndex);
-let speedProfileIndex = SEND_SPEED_PROFILES[initialSpeedProfileIndex]
-  ? initialSpeedProfileIndex
-  : DEFAULT_SPEED_PROFILE_INDEX;
+let sendTuning = normalizeSendTuning({
+  frameBytes: Number(cfgSpeed.dataset.frameBytes) || DEFAULT_SEND_TUNING.frameBytes,
+  txFps: Number(cfgSpeed.dataset.txFps) || DEFAULT_SEND_TUNING.txFps,
+  symbolsPerTick: Number(cfgSpeed.dataset.symbolsPerTick) || DEFAULT_SEND_TUNING.symbolsPerTick,
+});
+let detectedSenderCapabilities: SenderCapabilitiesDetail | null = null;
 
-function activeSpeedProfile() {
-  return SEND_SPEED_PROFILES[speedProfileIndex] ?? SEND_SPEED_PROFILES[DEFAULT_SPEED_PROFILE_INDEX]!;
+function senderCapabilitiesForHello(): SenderCapabilitiesDetail {
+  if (detectedSenderCapabilities) return detectedSenderCapabilities;
+  const navigatorWithMemory = navigator as Navigator & { deviceMemory?: number };
+  return {
+    logicalCores: Math.max(1, navigator.hardwareConcurrency || 1),
+    deviceMemoryGiB: navigatorWithMemory.deviceMemory,
+    shortViewportEdge: Math.round(Math.min(window.innerWidth, window.innerHeight)),
+    devicePixelRatio: window.devicePixelRatio || 1,
+  };
+}
+
+function activeSendTuning(): SendTuning {
+  return sendTuning;
 }
 
 function activeMaxFileBytes(): number {
-  return maximumFileBytes(activeSpeedProfile().frameBytes);
+  return maximumFileBytes(activeSendTuning().frameBytes);
 }
 
 function updateFileLimitLabel(): void {
@@ -281,7 +303,7 @@ async function selectFile(): Promise<void> {
     if (file.size > maxFileBytes) {
       throw new Error(
         `${file.name} 大小为 ${formatBytes(file.size)}，` +
-          `超过“${activeSpeedProfile().label}”档 ${formatBytes(maxFileBytes)} 限制。`,
+          `超过当前每码 ${activeSendTuning().frameBytes} 字节设置的 ${formatBytes(maxFileBytes)} 限制。`,
       );
     }
     const bytes = new Uint8Array(await file.arrayBuffer());
@@ -334,7 +356,7 @@ async function selectDirectory(): Promise<void> {
       if (archive.length > maxFileBytes) {
         throw new Error(
           `${rootName}.zip 大小为 ${formatBytes(archive.length)}，` +
-          `超过“${activeSpeedProfile().label}”档 ${formatBytes(maxFileBytes)} 限制。`,
+          `超过当前每码 ${activeSendTuning().frameBytes} 字节设置的 ${formatBytes(maxFileBytes)} 限制。`,
         );
       }
       const archiveName = `${rootName}.zip`;
@@ -455,6 +477,7 @@ async function main() {
   applyMode();
   window.addEventListener("resize", onResize);
   window.addEventListener(SEND_SPEED_CHANGE_EVENT, onSpeedChange);
+  window.addEventListener(SEND_CAPABILITIES_EVENT, onSenderCapabilities);
   window.addEventListener(SOURCE_ARCHIVE_OPTIONS_EVENT, onSourceArchiveOptions);
   window.addEventListener(SOURCE_ARCHIVE_CLEAR_EVENT, onSourceArchiveClear);
   window.addEventListener(SOURCE_ARCHIVE_SEND_EVENT, onSourceArchiveSend);
@@ -462,12 +485,12 @@ async function main() {
 
 const onResize = () => resizeDisplay?.();
 const onSpeedChange = (event: Event) => {
-  const nextIndex = (event as CustomEvent<number>).detail;
-  if (Number.isInteger(nextIndex) && SEND_SPEED_PROFILES[nextIndex]) {
-    speedProfileIndex = nextIndex;
-  }
+  sendTuning = normalizeSendTuning((event as CustomEvent<SendTuning>).detail);
   updateFileLimitLabel();
   void startStream();
+};
+const onSenderCapabilities = (event: Event) => {
+  detectedSenderCapabilities = (event as CustomEvent<SenderCapabilitiesDetail>).detail;
 };
 
 const onSourceArchiveSend = () => {
@@ -485,18 +508,19 @@ function scrollStageIntoView() {
 
 async function startStream(revealStage = false) {
   const gen = invalidateStream();
-  const speedProfile = activeSpeedProfile();
+  const tuning = activeSendTuning();
   if (!selectedFile) {
     setStatus(
-      `${speedProfile.label}档 · ${currentMode() === "snippet" ? "输入要发送的文字" : "选择文件开始"}`,
+      `${tuning.frameBytes} 字节 · ${tuning.txFps} FPS · 每次 ${tuning.symbolsPerTick} 码 · ` +
+        `${currentMode() === "snippet" ? "输入要发送的文字" : "选择文件开始"}`,
     );
     return;
   }
   const { name, size: fileSize, payload, compression, transmittedSize } = selectedFile;
   if (gen !== generation) return; // superseded while fetching
-  const txFps = speedProfile.txFps;
-  const frameBytes = speedProfile.frameBytes;
-  const symbolsPerTick = speedProfile.symbolsPerTick;
+  const txFps = tuning.txFps;
+  const frameBytes = tuning.frameBytes;
+  const symbolsPerTick = tuning.symbolsPerTick;
   const ecc = "L" as const;
 
   const sessionId = (Math.floor(Math.random() * 0xffff) + 1) & 0xffff;
@@ -504,14 +528,14 @@ async function startStream(revealStage = false) {
   // Keep selectedFile on this path — raising the combined speed preset is the fix,
   // and dropping the pick would hide that.
   if (!fitsInOneStream(payload.length, frameBytes)) {
-    const suggestion = SEND_SPEED_PROFILES.find((profile) =>
-      fitsInOneStream(payload.length, profile.frameBytes),
-    );
+    const suggestion = minimumFrameBytes(payload.length);
     showError(
       `${formatBytes(payload.length)} 需要 ` +
         `${sourceBlockCount(payload.length, frameBytes).toLocaleString()} 个数据块，` +
-        `已超过“${speedProfile.label}”档位上限。` +
-        (suggestion ? `请将传输速度调到“${suggestion.label}”。` : "请减小文件后重试。"),
+        `已超过当前每码 ${frameBytes} 字节的上限。` +
+        (suggestion <= SEND_TUNING_LIMITS.frameBytes.max
+          ? `请把“每码字节”至少调整为 ${suggestion}。`
+          : "请减小文件后重试。"),
     );
     return;
   }
@@ -521,7 +545,7 @@ async function startStream(revealStage = false) {
   ) * symbolsPerTick;
   let emittedSymbols = 0;
   reportSendProgress({ active: true, percent: 0, round: 1, emittedSymbols, targetSymbols });
-  showLoading(`${speedProfile.label}档 · 正在初始化 ${sourceBlocks.toLocaleString()} 个数据块和首批二维码…`);
+  showLoading(`正在按 ${frameBytes} 字节 / ${txFps} FPS / ${symbolsPerTick} 码初始化二维码…`);
   await afterNextPaint();
   if (gen !== generation) return;
 
@@ -542,6 +566,8 @@ async function startStream(revealStage = false) {
   const stagingContext = staging.getContext("2d")!;
   const canvasContexts = canvases.map((target) => target.getContext("2d")!);
   const visibleFrames: (ImageData | null)[] = canvases.map(() => null);
+  let capabilityFrame: ImageData | null = null;
+  let capabilityCanvas: HTMLCanvasElement | null = null;
   const queue: ImageData[] = [];
   let nextSeq = 0;
   let layoutRestartScheduled = false;
@@ -576,14 +602,17 @@ async function startStream(revealStage = false) {
     if (gridBudget <= 0) return;
     const gridStyle = getComputedStyle(qrGrid);
     const gap = Number.parseFloat(gridStyle.columnGap) || 0;
-    if (!canFitQrGridAtIntegerPixels(total, gridBudget, gap, dpr) && speedProfileIndex > 0 && !layoutRestartScheduled) {
-      const nextIndex = speedProfileIndex - 1;
-      const nextProfile = SEND_SPEED_PROFILES[nextIndex]!;
-      if (fitsInOneStream(payload.length, nextProfile.frameBytes)) {
+    if (!canFitQrGridAtIntegerPixels(total, gridBudget, gap, dpr) && !layoutRestartScheduled) {
+      const nextTuning = normalizeSendTuning({
+        ...tuning,
+        frameBytes: Math.max(minimumFrameBytes(payload.length), frameBytes - 100),
+      });
+      const nextFrameBytes = nextTuning.frameBytes;
+      if (nextFrameBytes < frameBytes && fitsInOneStream(payload.length, nextFrameBytes)) {
         layoutRestartScheduled = true;
-        speedProfileIndex = nextIndex;
-        window.dispatchEvent(new CustomEvent<number>(SEND_SPEED_SYNC_EVENT, { detail: nextIndex }));
-        setStatus(`当前画面较窄，已自动降到“${nextProfile.label}”以完整显示四个二维码`);
+        sendTuning = nextTuning;
+        window.dispatchEvent(new CustomEvent<SendTuning>(SEND_SPEED_SYNC_EVENT, { detail: sendTuning }));
+        setStatus(`当前画面较窄，已把每码字节自动调整为 ${nextFrameBytes}`);
         window.setTimeout(() => void startStream(true), 0);
         return;
       }
@@ -608,11 +637,15 @@ async function startStream(revealStage = false) {
 
   function drawSymbol(index: number, frame: ImageData) {
     visibleFrames[index] = frame;
-    stagingContext.putImageData(frame, 0, 0);
     const ctx = canvasContexts[index]!;
     const target = canvases[index]!;
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(staging, 0, 0, target.width, target.height);
+    if (frame === capabilityFrame && capabilityCanvas) {
+      ctx.drawImage(capabilityCanvas, 0, 0, target.width, target.height);
+    } else {
+      stagingContext.putImageData(frame, 0, 0);
+      ctx.drawImage(staging, 0, 0, target.width, target.height);
+    }
   }
 
   const makeFrame = (): ImageData => {
@@ -635,7 +668,7 @@ async function startStream(revealStage = false) {
       const refreshMode = symbolsPerTick === QR_GRID_CELLS ? "同步刷新" : "轮流刷新";
       const refreshesPerCode = txFps * symbolsPerTick / QR_GRID_CELLS;
       setStatus(
-        `${speedProfile.label} · ${QR_GRID_CELLS} QR ${refreshMode} · ` +
+        `${QR_GRID_CELLS} QR ${refreshMode} · ` +
           `${txFps * symbolsPerTick} symbols/s · 每码 ${refreshesPerCode} 次/s · ` +
           `${frameBytes} 字节 · V${version} · ${scale} px/模块 · ECC ${ecc} · ` +
           `${name} · ${formatBytes(fileSize)} · ` +
@@ -669,6 +702,46 @@ async function startStream(revealStage = false) {
     }
   };
   const initialFrames = Array.from({ length: QR_GRID_CELLS }, () => makeFrame());
+  const capabilities = senderCapabilitiesForHello();
+  const createCapabilityFrame = (senderUtilizationPercent?: number): ImageData => {
+    const helloBytes = packSenderCapabilityHello({
+      sessionId,
+      logicalCores: capabilities.logicalCores,
+      deviceMemoryGiB: capabilities.deviceMemoryGiB,
+      refreshRateHz: capabilities.refreshRateHz,
+      shortViewportEdge: capabilities.shortViewportEdge,
+      devicePixelRatio: capabilities.devicePixelRatio ?? 1,
+      txFps,
+      symbolsPerTick,
+      frameBytes,
+      senderUtilizationPercent,
+    });
+    const helloQr = QRCode.create(
+      [{ data: helloBytes, mode: "byte" } as unknown as QRCode.QRCodeSegment],
+      { errorCorrectionLevel: "M", maskPattern: 4 },
+    );
+    const helloRaster = rasterizeQr(helloQr.modules.size, helloQr.modules.data, MARGIN);
+    const frame = new ImageData(
+      new Uint8ClampedArray(helloRaster.pixels.buffer),
+      helloRaster.size,
+      helloRaster.size,
+    );
+    capabilityFrame = frame;
+    capabilityCanvas = document.createElement("canvas");
+    capabilityCanvas.width = frame.width;
+    capabilityCanvas.height = frame.height;
+    capabilityCanvas.getContext("2d")!.putImageData(frame, 0, 0);
+    return frame;
+  };
+  let helloFrame = createCapabilityFrame();
+  canvases.forEach((_, index) => drawSymbol(index, helloFrame));
+  setStatus(
+    `正在发送设备能力 · ${capabilities.logicalCores} 线程 · ` +
+      `${capabilities.deviceMemoryGiB ?? "未知"} GiB · ${frameBytes} 字节 / ${txFps} FPS / ${symbolsPerTick} 码`,
+  );
+  await new Promise((resolve) => window.setTimeout(resolve, CAPABILITY_PREAMBLE_MS));
+  if (gen !== generation) return;
+
   initialFrames.forEach((frame, index) => drawSymbol(index, frame));
   emittedSymbols = initialFrames.length;
   const emittedInInitialRound = ((emittedSymbols - 1) % targetSymbols) + 1;
@@ -680,12 +753,19 @@ async function startStream(revealStage = false) {
     targetSymbols,
   });
   let lastProgressReportAt = performance.now();
+  let lastRateAt = lastProgressReportAt;
+  let lastRateEmitted = emittedSymbols;
+  let actualSymbolsPerSecond = 0;
+  let totalDisplayTicks = 0;
+  let starvedDisplayTicks = 0;
 
   const interval = 1000 / txFps;
   let nextAt = performance.now();
   let animationFrameId = 0;
   let pumpTimer: number | null = null;
   let nextCanvasIndex = 0;
+  let nextCapabilityBurstAt = performance.now() + CAPABILITY_REPEAT_INTERVAL_MS;
+  let capabilityBurstUntil = 0;
   const schedulePump = () => {
     if (pumpTimer !== null || generatorFailed || gen !== generation) return;
     pumpTimer = window.setTimeout(() => {
@@ -694,35 +774,65 @@ async function startStream(revealStage = false) {
     }, 0);
   };
   schedulePump();
+  const reportRuntimeProgress = (now: number) => {
+    if (!isSendProgressReportDue(now, lastProgressReportAt)) return;
+    const seconds = Math.max(0.001, (now - lastRateAt) / 1000);
+    const instantRate = (emittedSymbols - lastRateEmitted) / seconds;
+    actualSymbolsPerSecond = actualSymbolsPerSecond === 0
+      ? instantRate
+      : actualSymbolsPerSecond * 0.7 + instantRate * 0.3;
+    const targetSymbolsPerSecond = txFps * symbolsPerTick;
+    const round = Math.floor((emittedSymbols - 1) / targetSymbols) + 1;
+    const emittedInRound = ((emittedSymbols - 1) % targetSymbols) + 1;
+    reportSendProgress({
+      active: true,
+      percent: emittedInRound / targetSymbols * 100,
+      round,
+      emittedSymbols: emittedInRound,
+      targetSymbols,
+      actualSymbolsPerSecond,
+      targetSymbolsPerSecond,
+      senderUtilizationPercent: Math.min(100, actualSymbolsPerSecond / targetSymbolsPerSecond * 100),
+      queueStarvedPercent: totalDisplayTicks === 0 ? 0 : starvedDisplayTicks / totalDisplayTicks * 100,
+    });
+    lastRateAt = now;
+    lastRateEmitted = emittedSymbols;
+    lastProgressReportAt = now;
+  };
   const tick = (now: number) => {
     // generatorFailed means no frame will ever be produced again, so stop the
     // rAF loop rather than spinning on an empty queue until a settings change.
     if (gen !== generation || generatorFailed) return;
     animationFrameId = requestAnimationFrame(tick);
     if (now + 0.5 < nextAt) return;
-    if (queue.length < symbolsPerTick) {
+    totalDisplayTicks++;
+    if (now >= nextCapabilityBurstAt) {
+      helloFrame = createCapabilityFrame(
+        Math.min(100, actualSymbolsPerSecond / (txFps * symbolsPerTick) * 100),
+      );
+      capabilityBurstUntil = now + CAPABILITY_REPEAT_BURST_MS;
+      nextCapabilityBurstAt = now + CAPABILITY_REPEAT_INTERVAL_MS;
+    }
+    const showCapability = now < capabilityBurstUntil;
+    const dataSlots = Math.max(0, symbolsPerTick - (showCapability ? 1 : 0));
+    if (queue.length < dataSlots) {
+      starvedDisplayTicks++;
       schedulePump();
+      reportRuntimeProgress(now);
       nextAt = now + interval;
       return;
     }
-    const batch = queue.splice(0, symbolsPerTick);
+    if (showCapability) {
+      drawSymbol(nextCanvasIndex, helloFrame);
+      nextCanvasIndex = (nextCanvasIndex + 1) % QR_GRID_CELLS;
+    }
+    const batch = queue.splice(0, dataSlots);
     for (const frame of batch) {
       drawSymbol(nextCanvasIndex, frame);
       nextCanvasIndex = (nextCanvasIndex + 1) % QR_GRID_CELLS;
     }
-    emittedSymbols += symbolsPerTick;
-    if (isSendProgressReportDue(now, lastProgressReportAt)) {
-      const round = Math.floor((emittedSymbols - 1) / targetSymbols) + 1;
-      const emittedInRound = ((emittedSymbols - 1) % targetSymbols) + 1;
-      reportSendProgress({
-        active: true,
-        percent: emittedInRound / targetSymbols * 100,
-        round,
-        emittedSymbols: emittedInRound,
-        targetSymbols,
-      });
-      lastProgressReportAt = now;
-    }
+    emittedSymbols += dataSlots;
+    reportRuntimeProgress(now);
     schedulePump();
     nextAt += interval;
     if (now - nextAt > 3 * interval) nextAt = now + interval; // fell behind — don't burst
@@ -742,6 +852,7 @@ return () => {
   invalidateStream();
   window.removeEventListener("resize", onResize);
   window.removeEventListener(SEND_SPEED_CHANGE_EVENT, onSpeedChange);
+  window.removeEventListener(SEND_CAPABILITIES_EVENT, onSenderCapabilities);
   window.removeEventListener(SOURCE_ARCHIVE_OPTIONS_EVENT, onSourceArchiveOptions);
   window.removeEventListener(SOURCE_ARCHIVE_CLEAR_EVENT, onSourceArchiveClear);
   window.removeEventListener(SOURCE_ARCHIVE_SEND_EVENT, onSourceArchiveSend);

@@ -21,16 +21,22 @@ import { FileSelectPanel } from "@/routes/components/file-select-panel";
 import {
   describeDeviceCapabilities,
   recommendSpeedProfile,
-  recommendedProfileLabel,
 } from "../../../../shared/device-profile";
 import { HEADER_LEN } from "../../../../shared/protocol";
-import { SEND_PROGRESS_EVENT, type SendProgressDetail } from "../../../../shared/send-events";
 import {
-  DEFAULT_SPEED_PROFILE_INDEX,
+  SEND_CAPABILITIES_EVENT,
+  SEND_PROGRESS_EVENT,
+  type SendProgressDetail,
+} from "../../../../shared/send-events";
+import {
+  DEFAULT_SEND_TUNING,
   QR_GRID_CELLS,
   SEND_SPEED_CHANGE_EVENT,
   SEND_SPEED_SYNC_EVENT,
   SEND_SPEED_PROFILES,
+  SEND_TUNING_LIMITS,
+  normalizeSendTuning,
+  type SendTuning,
 } from "../../../../shared/send-settings";
 
 function SendModeTabs() {
@@ -181,22 +187,22 @@ function SendTransferDialog() {
 }
 
 function TransferSpeedControl({ compact = false }: { compact?: boolean }) {
-  const [index, setIndex] = useState(DEFAULT_SPEED_PROFILE_INDEX);
+  const [tuning, setTuning] = useState<SendTuning>({ ...DEFAULT_SEND_TUNING });
   const [inspection, setInspection] = useState("正在检测处理器、内存、刷新率和可用画面尺寸…");
   const manuallySelected = useRef(false);
-  const profile = SEND_SPEED_PROFILES[index]!;
   const rawKiBPerSecond = Math.round(
-    profile.symbolsPerTick * profile.txFps * (profile.frameBytes - HEADER_LEN) / 1024,
+    tuning.symbolsPerTick * tuning.txFps * (tuning.frameBytes - HEADER_LEN) / 1024,
   );
 
-  const applySpeed = (nextIndex: number) => {
-    setIndex(nextIndex);
-    window.dispatchEvent(new CustomEvent<number>(SEND_SPEED_CHANGE_EVENT, { detail: nextIndex }));
+  const applyTuning = (next: SendTuning) => {
+    const normalized = normalizeSendTuning(next);
+    setTuning(normalized);
+    window.dispatchEvent(new CustomEvent<SendTuning>(SEND_SPEED_CHANGE_EVENT, { detail: normalized }));
   };
 
-  const selectSpeed = (nextIndex: number) => {
+  const updateTuning = (field: keyof SendTuning, value: number) => {
     manuallySelected.current = true;
-    applySpeed(nextIndex);
+    applyTuning({ ...tuning, [field]: value });
   };
 
   useEffect(() => {
@@ -204,18 +210,20 @@ function TransferSpeedControl({ compact = false }: { compact?: boolean }) {
     void inspectDeviceCapabilities().then((capabilities) => {
       if (cancelled) return;
       const recommendation = recommendSpeedProfile(capabilities);
-      const label = recommendedProfileLabel(recommendation);
+      const recommended = SEND_SPEED_PROFILES[recommendation.profileIndex]!;
+      window.dispatchEvent(new CustomEvent(SEND_CAPABILITIES_EVENT, { detail: capabilities }));
       setInspection(
-        `${describeDeviceCapabilities(capabilities)}。推荐“${label}”：${recommendation.explanation}。` +
+        `${describeDeviceCapabilities(capabilities)}。初始建议：每码 ${recommended.frameBytes} 字节、` +
+          `${recommended.txFps} FPS、每次更新 ${recommended.symbolsPerTick} 码。${recommendation.explanation}。` +
           (manuallySelected.current ? " 已保留你的手动选择。" : " 已自动应用。"),
       );
-      if (!manuallySelected.current) applySpeed(recommendation.profileIndex);
+      if (!manuallySelected.current) applyTuning(recommended);
     });
     return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
-    const sync = (event: Event) => setIndex((event as CustomEvent<number>).detail);
+    const sync = (event: Event) => setTuning(normalizeSendTuning((event as CustomEvent<SendTuning>).detail));
     window.addEventListener(SEND_SPEED_SYNC_EVENT, sync);
     return () => window.removeEventListener(SEND_SPEED_SYNC_EVENT, sync);
   }, []);
@@ -223,7 +231,9 @@ function TransferSpeedControl({ compact = false }: { compact?: boolean }) {
   return (
     <section
       id="cfg-speed"
-      data-speed-index={index}
+      data-frame-bytes={tuning.frameBytes}
+      data-tx-fps={tuning.txFps}
+      data-symbols-per-tick={tuning.symbolsPerTick}
       className={cn(
         "app-style-49",
         compact ? "app-style-50" : "app-style-51",
@@ -232,34 +242,49 @@ function TransferSpeedControl({ compact = false }: { compact?: boolean }) {
       <div className="app-style-52">
         <div>
           <p className="app-style-53">传输速度</p>
-          {!compact ? <p className="app-style-54">自动选择当前电脑可承受的最高档位</p> : null}
+          {!compact ? <p className="app-style-54">自动检测后给出初始数字，可手动精确调整</p> : null}
         </div>
         <output className="app-style-55">
-          {profile.label} · 理论约 {rawKiBPerSecond} KiB/s
+          理论约 {rawKiBPerSecond} KiB/s
         </output>
       </div>
       <div
-        className={cn("speed-profile-buttons", compact && "is-compact")}
-        role="group"
-        aria-label="传输速度"
+        className={cn("send-tuning-fields", compact && "is-compact")}
+        aria-label="数字传输参数"
       >
-        {SEND_SPEED_PROFILES.map((option, optionIndex) => {
-          const speed = Math.round(
-            option.symbolsPerTick * option.txFps * (option.frameBytes - HEADER_LEN) / 1024,
-          );
-          return (
-            <button
-              key={option.label}
-              type="button"
-              className={cn("speed-profile-button", optionIndex === index && "is-active")}
-              aria-pressed={optionIndex === index}
-              onClick={() => selectSpeed(optionIndex)}
-            >
-              <strong>{option.label}</strong>
-              <span>理论约 {speed} KiB/s</span>
-            </button>
-          );
-        })}
+        <label>
+          <span>每码字节</span>
+          <input
+            type="number"
+            min={SEND_TUNING_LIMITS.frameBytes.min}
+            max={SEND_TUNING_LIMITS.frameBytes.max}
+            step={25}
+            value={tuning.frameBytes}
+            onChange={(event) => updateTuning("frameBytes", Number(event.currentTarget.value))}
+          />
+        </label>
+        <label>
+          <span>刷新 FPS</span>
+          <input
+            type="number"
+            min={SEND_TUNING_LIMITS.txFps.min}
+            max={SEND_TUNING_LIMITS.txFps.max}
+            step={1}
+            value={tuning.txFps}
+            onChange={(event) => updateTuning("txFps", Number(event.currentTarget.value))}
+          />
+        </label>
+        <label>
+          <span>每次更新码数</span>
+          <input
+            type="number"
+            min={SEND_TUNING_LIMITS.symbolsPerTick.min}
+            max={SEND_TUNING_LIMITS.symbolsPerTick.max}
+            step={1}
+            value={tuning.symbolsPerTick}
+            onChange={(event) => updateTuning("symbolsPerTick", Number(event.currentTarget.value))}
+          />
+        </label>
       </div>
       {compact ? (
         <p className="app-style-61" aria-live="polite">{inspection}</p>
@@ -267,7 +292,7 @@ function TransferSpeedControl({ compact = false }: { compact?: boolean }) {
         <>
           <p className="app-style-62" aria-live="polite">{inspection}</p>
           <p className="app-style-63">
-            检测仅覆盖发送电脑；相机、远程桌面压缩和接收端性能不可见，识别不稳时请手动降档。
+            接收端会显示推荐的具体数字；发送端按推荐值手动调整。
           </p>
         </>
       )}
@@ -306,7 +331,13 @@ function SendBroadcastProgress({ compact = false }: { compact?: boolean }) {
       </div>
       <Progress value={progress.percent} aria-label="发送广播进度" />
       <p className={cn("app-style-71", compact ? "app-style-59" : "app-style-72")}>
-        {preparing ? "正在创建编码器和首批二维码，请稍候…" : "一轮建议symbol播放比例；是否完成以接收端为准。"}
+        {preparing
+          ? "正在发送设备能力并创建首批二维码，请稍候…"
+          : progress.actualSymbolsPerSecond !== undefined
+            ? `实际 ${progress.actualSymbolsPerSecond.toFixed(1)}/${progress.targetSymbolsPerSecond?.toFixed(0)} symbols/s` +
+              ` · 输出达成 ${progress.senderUtilizationPercent?.toFixed(0)}%` +
+              ` · 队列等待 ${progress.queueStarvedPercent?.toFixed(1)}%`
+            : "一轮建议symbol播放比例；是否完成以接收端为准。"}
       </p>
     </section>
   );

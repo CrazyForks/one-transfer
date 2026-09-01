@@ -6,7 +6,7 @@ import {
   estimateOpticalThroughput,
   estimateRawKiBPerSecond,
 } from "../shared/throughput.ts";
-import { SEND_SPEED_PROFILES } from "../shared/send-settings.ts";
+import { SEND_SPEED_PROFILES, normalizeSendTuning } from "../shared/send-settings.ts";
 
 test("the default four-QR layout produces 120 symbols per second", () => {
   const estimate = estimateOpticalThroughput(DEFAULT_OPTICAL_THROUGHPUT_CONFIG, {
@@ -35,6 +35,14 @@ test("speed profiles declare their own symbols per display tick", () => {
     stable!.symbolsPerTick * stable!.txFps * (stable!.frameBytes - 20) / 1024,
     84.66796875,
   );
+});
+
+test("numeric sender settings are clamped to supported QR and display limits", () => {
+  assert.deepEqual(normalizeSendTuning({ frameBytes: 300, txFps: 100, symbolsPerTick: 9 }), {
+    frameBytes: 500,
+    txFps: 60,
+    symbolsPerTick: 4,
+  });
 });
 
 test("raw throughput excludes the per-symbol protocol header", () => {

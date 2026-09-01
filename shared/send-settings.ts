@@ -17,11 +17,47 @@ export const QR_SYMBOLS_PER_TICK = QR_GRID_CELLS;
 export const DEFAULT_TX_FPS = 30;
 export const DEFAULT_FRAME_BYTES = 1700;
 
-export interface SendSpeedProfile {
-  label: string;
+export interface SendTuning {
   txFps: number;
   frameBytes: number;
   symbolsPerTick: number;
+}
+
+export interface SendSpeedProfile extends SendTuning {
+  label: string;
+}
+
+export const SEND_TUNING_LIMITS = {
+  txFps: { min: 10, max: 60 },
+  frameBytes: { min: 500, max: 2331 },
+  symbolsPerTick: { min: 1, max: QR_GRID_CELLS },
+} as const;
+
+export const DEFAULT_SEND_TUNING: Readonly<SendTuning> = {
+  txFps: DEFAULT_TX_FPS,
+  frameBytes: DEFAULT_FRAME_BYTES,
+  symbolsPerTick: QR_SYMBOLS_PER_TICK,
+};
+
+function clampInteger(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(max, Math.max(min, Math.round(value)));
+}
+
+export function normalizeSendTuning(tuning: SendTuning): SendTuning {
+  return {
+    txFps: clampInteger(tuning.txFps, SEND_TUNING_LIMITS.txFps.min, SEND_TUNING_LIMITS.txFps.max),
+    frameBytes: clampInteger(
+      tuning.frameBytes,
+      SEND_TUNING_LIMITS.frameBytes.min,
+      SEND_TUNING_LIMITS.frameBytes.max,
+    ),
+    symbolsPerTick: clampInteger(
+      tuning.symbolsPerTick,
+      SEND_TUNING_LIMITS.symbolsPerTick.min,
+      SEND_TUNING_LIMITS.symbolsPerTick.max,
+    ),
+  };
 }
 
 /** One slider replaces independent settings that could form poor combinations. */

@@ -40,6 +40,15 @@ import {
   initialCameraCaptureFps,
   initialDecodeWorkers,
 } from "../shared/receive-settings";
+import {
+  parseSenderCapabilityHello,
+  receiverDecodeUtilizationPercent,
+  recommendReceiverTuning,
+  refineReceiverTuning,
+  recommendSenderTuning,
+  type ReceiverLinkMetrics,
+  type SenderCapabilityHello,
+} from "../shared/link-calibration";
 
 export function mountReceive() {
 const startBtn = document.getElementById("start") as HTMLButtonElement;
@@ -59,6 +68,11 @@ const cfgWidth = document.getElementById("cfg-width") as HTMLSelectElement;
 const cfgCapFps = document.getElementById("cfg-capfps") as HTMLSelectElement;
 const cfgWorkers = document.getElementById("cfg-workers") as HTMLSelectElement;
 const captureActual = document.getElementById("capture-actual")!;
+const linkCalibration = document.getElementById("link-calibration")!;
+const linkCalibrationStatus = document.getElementById("link-calibration-status")!;
+const linkSenderInfo = document.getElementById("link-sender-info")!;
+const linkReceiverInfo = document.getElementById("link-receiver-info")!;
+const linkSenderRecommendation = document.getElementById("link-sender-recommendation")!;
 const receiveLog = document.getElementById("receive-log")!;
 const copyReceiveLog = document.getElementById("copy-receive-log") as HTMLButtonElement;
 const clearReceiveLog = document.getElementById("clear-receive-log") as HTMLButtonElement;
@@ -101,6 +115,7 @@ const STATS_WINDOW_MS = 2000;
 let stream: MediaStream | null = null;
 let decoder: LTDecoder | null = null;
 let streamKey = "";
+let activeSessionId = 0;
 let startTs = 0;
 let captureGen = 0;
 let captureSource: "screen" | "camera" = "screen";
@@ -112,6 +127,10 @@ let disposed = false;
 let cameraFpsInitialized = false;
 let captureFpsManuallySet = false;
 let decodeWorkersInitialized = false;
+let workersManuallySet = false;
+let senderHello: SenderCapabilityHello | null = null;
+let senderHelloSessionId = 0;
+let lastAutomaticReceiverTuneAt = 0;
 let parsedPayloadCount = 0;
 let invalidPayloadCount = 0;
 let lastDiagnosticAt = 0;
@@ -168,6 +187,7 @@ function offerRetry(message: string) {
   pool.resize(0);
   decoder = null;
   streamKey = "";
+  activeSessionId = 0;
   finishing = false;
   startBtn.disabled = false;
   cameraBtn.disabled = false;
@@ -177,6 +197,9 @@ function offerRetry(message: string) {
   preview.style.display = "none";
   preview.style.aspectRatio = "";
   metricsEl.style.display = "none";
+  linkCalibration.hidden = true;
+  senderHello = null;
+  senderHelloSessionId = 0;
   progressEl.style.display = "none";
   progressStatus.style.display = "none";
   bar.style.width = "0";
@@ -199,6 +222,7 @@ function stopCaptureForNavigation() {
   pool.resize(0);
   decoder = null;
   streamKey = "";
+  activeSessionId = 0;
   finishing = false;
   startBtn.disabled = false;
   cameraBtn.disabled = false;
@@ -208,6 +232,9 @@ function stopCaptureForNavigation() {
   preview.style.display = "none";
   preview.style.aspectRatio = "";
   metricsEl.style.display = "none";
+  linkCalibration.hidden = true;
+  senderHello = null;
+  senderHelloSessionId = 0;
   progressEl.style.display = "none";
   progressStatus.style.display = "none";
   bar.style.width = "0";
@@ -299,6 +326,11 @@ async function start(source: "screen" | "camera") {
   captureActions.style.display = "none";
   preview.style.display = "block";
   metricsEl.style.display = "grid";
+  linkCalibration.hidden = false;
+  linkCalibrationStatus.textContent = "等待发送端能力信息";
+  linkSenderInfo.textContent = "等待能力二维码";
+  linkReceiverInfo.textContent = `${navigator.hardwareConcurrency || 4} 线程 · 正在测量解码负载`;
+  linkSenderRecommendation.textContent = "收到能力信息后给出发送端数字建议";
   progressEl.style.display = "block";
   progressStatus.style.display = "flex";
   progressEl.setAttribute("aria-valuenow", "0");
@@ -349,6 +381,7 @@ async function start(source: "screen" | "camera") {
     for (const el of [cfgWidth, cfgCapFps, cfgWorkers]) {
       el.addEventListener("change", () => {
         if (el === cfgCapFps) captureFpsManuallySet = true;
+        if (el === cfgWorkers) workersManuallySet = true;
         void applyReceiveSettings();
       });
     }
@@ -470,7 +503,86 @@ function captureFrame() {
   );
 }
 
+function renderSenderRecommendation(metrics?: ReceiverLinkMetrics): void {
+  if (!senderHello) return;
+  const recommendation = recommendSenderTuning(
+    senderHello,
+    navigator.hardwareConcurrency || 4,
+    metrics,
+  );
+  const tuning = recommendation.tuning;
+  linkSenderRecommendation.textContent =
+    `建议发送端：每码 ${tuning.frameBytes} 字节 · ${tuning.txFps} FPS · ` +
+    `每次更新 ${tuning.symbolsPerTick} 码。${recommendation.explanation}`;
+}
+
+function handleSenderCapabilityHello(hello: SenderCapabilityHello): void {
+  const isNewSession = hello.sessionId !== senderHelloSessionId;
+  const previousSenderUtilization = senderHello?.senderUtilizationPercent;
+  if (!isNewSession && previousSenderUtilization === hello.senderUtilizationPercent) return;
+  senderHello = hello;
+  linkSenderInfo.textContent =
+    `${hello.logicalCores} 线程 · ${hello.deviceMemoryGiB ?? "未知"} GiB · ` +
+    `${hello.refreshRateHz ?? "未知"} Hz · ${hello.frameBytes} 字节 / ` +
+    `${hello.txFps} FPS / ${hello.symbolsPerTick} 码 · ` +
+    (hello.senderUtilizationPercent === undefined
+      ? "输出达成采集中"
+      : `输出达成 ${hello.senderUtilizationPercent}%`);
+  if (!isNewSession) {
+    diagnosticLog("sender-utilization", {
+      sessionId: hello.sessionId,
+      senderUtilizationPercent: hello.senderUtilizationPercent,
+    });
+    return;
+  }
+  if (noSignal.isVisible) {
+    noSignal.dismiss(performance.now());
+    replaceResult();
+  }
+  senderHelloSessionId = hello.sessionId;
+  lastAutomaticReceiverTuneAt = performance.now();
+  if (activeSessionId !== hello.sessionId) {
+    decoder = null;
+    streamKey = "";
+    activeSessionId = 0;
+    startTs = 0;
+    finishing = false;
+    bar.style.width = "0";
+    progressEl.setAttribute("aria-valuenow", "0");
+    progressLabel.textContent = "0% · 设备匹配完成";
+    etaLabel.textContent = "等待文件数据帧";
+  }
+  const receiverCores = navigator.hardwareConcurrency || 4;
+  const receiverTuning = recommendReceiverTuning(hello, receiverCores);
+  if (!captureFpsManuallySet) cfgCapFps.value = String(receiverTuning.captureFps);
+  if (!workersManuallySet) cfgWorkers.value = String(receiverTuning.workers);
+  pool.resize(Number(cfgWorkers.value));
+  void applyReceiveSettings();
+
+  linkCalibration.hidden = false;
+  linkCalibrationStatus.textContent = "已收到发送端能力，接收参数已匹配";
+  linkReceiverInfo.textContent =
+    `${receiverCores} 线程 · ${cfgCapFps.value} FPS · ${cfgWorkers.value} Worker`;
+  renderSenderRecommendation();
+  diagnosticLog("sender-capabilities", {
+    sessionId: hello.sessionId,
+    logicalCores: hello.logicalCores,
+    deviceMemoryGiB: hello.deviceMemoryGiB,
+    refreshRateHz: hello.refreshRateHz,
+    frameBytes: hello.frameBytes,
+    txFps: hello.txFps,
+    symbolsPerTick: hello.symbolsPerTick,
+    receiverCaptureFps: Number(cfgCapFps.value),
+    receiverWorkers: Number(cfgWorkers.value),
+  });
+}
+
 function onDecoded(bytes: Uint8Array) {
+  const hello = parseSenderCapabilityHello(bytes);
+  if (hello) {
+    handleSenderCapabilityHello(hello);
+    return;
+  }
   decodeTimes.push(performance.now());
   const parsed = parseFrame(bytes);
   if (!parsed) {
@@ -491,6 +603,7 @@ function onDecoded(bytes: Uint8Array) {
   if (!decoder || streamKey !== identity) {
     decoder = new LTDecoder(header.k, header.blockLen, header.sessionId, header.totalLen);
     streamKey = identity;
+    activeSessionId = header.sessionId;
     startTs = performance.now();
     bar.classList.remove("error");
     bar.style.width = "0";
@@ -634,6 +747,7 @@ async function finish(
   } finally {
     decoder = null;
     streamKey = "";
+    activeSessionId = 0;
     startTs = 0;
     finishing = false;
     progressEl.style.display = "none";
@@ -771,6 +885,54 @@ function updateStats() {
   metric("m-k").textContent = String(decoder.k);
   metric("m-block").textContent = `${decoder.blockLen} B`;
   metric("m-payload").textContent = `${Math.round(decoder.totalLen / 1024)} KB`;
+
+  if (senderHello) {
+    const submittedOrDropped = decode.submitted + busyDropCount;
+    const receivedFrames = decoder.framesNew + decoder.framesDup;
+    const linkMetrics: ReceiverLinkMetrics = {
+      sampleSeconds: elapsed,
+      averageDecodeMs: decode.averageDecodeMs,
+      captureFps,
+      workers: pool.size,
+      busyDropPercent: submittedOrDropped === 0 ? 0 : busyDropCount / submittedOrDropped * 100,
+      uniqueFramesPerSecond: decoder.framesNew / Math.max(0.1, elapsed),
+      duplicatePercent: receivedFrames === 0 ? 0 : decoder.framesDup / receivedFrames * 100,
+      netKiBps: goodputKbs(elapsed),
+    };
+    const utilization = receiverDecodeUtilizationPercent(linkMetrics);
+    linkCalibrationStatus.textContent = `已动态匹配 · 已采样 ${elapsed.toFixed(0)} 秒`;
+    linkReceiverInfo.textContent =
+      `${navigator.hardwareConcurrency || 4} 线程 · ${cfgCapFps.value} FPS / ${pool.size}W · ` +
+      `负载 ${utilization.toFixed(0)}% · ` +
+      `忙丢 ${linkMetrics.busyDropPercent.toFixed(1)}%`;
+    renderSenderRecommendation(linkMetrics);
+
+    if (now - lastAutomaticReceiverTuneAt >= 8_000) {
+      const currentCaptureFps = Number(cfgCapFps.value) as 30 | 45 | 60;
+      const refined = refineReceiverTuning(
+        senderHello,
+        navigator.hardwareConcurrency || 4,
+        { captureFps: currentCaptureFps, workers: pool.size },
+        linkMetrics,
+      );
+      const nextCaptureFps = captureFpsManuallySet ? currentCaptureFps : refined.captureFps;
+      const nextWorkers = workersManuallySet ? pool.size : refined.workers;
+      if (nextCaptureFps !== currentCaptureFps || nextWorkers !== pool.size) {
+        cfgCapFps.value = String(nextCaptureFps);
+        cfgWorkers.value = String(nextWorkers);
+        linkCalibrationStatus.textContent = `正在动态调整接收端 · ${refined.explanation}`;
+        diagnosticLog("receiver-auto-tuning", {
+          captureFps: nextCaptureFps,
+          workers: nextWorkers,
+          utilization: Number(utilization.toFixed(1)),
+          busyDropPercent: Number(linkMetrics.busyDropPercent.toFixed(1)),
+          reason: refined.explanation,
+        });
+        void applyReceiveSettings();
+      }
+      lastAutomaticReceiverTuneAt = now;
+    }
+  }
 
   if (now - lastDiagnosticAt >= STATS_WINDOW_MS) {
     lastDiagnosticAt = now;
