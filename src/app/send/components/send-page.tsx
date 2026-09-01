@@ -314,9 +314,15 @@ function TransferSpeedControl({ compact = false }: { compact?: boolean }) {
       setInspection(
         `${describeDeviceCapabilities(capabilities)}。初始建议：每码 ${recommended.frameBytes} 字节、` +
           `${recommended.txFps} FPS、每次更新 ${recommended.symbolsPerTick} 码。${recommendation.explanation}。` +
-          (manuallySelected.current ? " 已保留你的手动选择。" : " 已填入建议值，确认后生效。"),
+          (manuallySelected.current ? " 已保留你的手动选择。" : " 已自动应用建议值。"),
       );
-      if (!manuallySelected.current) reset(tuningToDraft(normalizeSendTuning(recommended)));
+      if (!manuallySelected.current) {
+        const normalized = normalizeSendTuning(recommended);
+        appliedTuningRef.current = normalized;
+        reset(tuningToDraft(normalized));
+        setAppliedTuning(normalized);
+        window.dispatchEvent(new CustomEvent<SendTuning>(SEND_SPEED_CHANGE_EVENT, { detail: normalized }));
+      }
     });
     return () => { cancelled = true; };
   }, []);
@@ -351,7 +357,7 @@ function TransferSpeedControl({ compact = false }: { compact?: boolean }) {
       <div className="app-style-52">
         <div>
           <p className="app-style-53">传输速度</p>
-          {!compact ? <p className="app-style-54">自动检测后给出初始数字，确认应用后生效</p> : null}
+          {!compact ? <p className="app-style-54">自动检测并应用初始数字，手动调整需确认</p> : null}
         </div>
         <output className="app-style-55">
           {hasPendingChanges ? "待确认" : "理论约"}{rawKiBPerSecond === null ? " —" : ` ${rawKiBPerSecond} KiB/s`}

@@ -2,14 +2,14 @@ import {
   isValidWindowsFileName,
   type ClipboardTextCodec,
   type EncodedClipboardTransfer,
-} from "../shared/clipboard-transfer";
+} from "../../../shared/clipboard-transfer";
 import {
   createClipboardDirectoryArchiveInWorker,
   encodeClipboardTransferInWorker,
-} from "../shared/clipboard-processing-client";
-import { formatBytes } from "../shared/format";
-import { statusLine } from "../shared/status-line";
-import { createSourceArchiveInWorker } from "../shared/source-archive-client";
+} from "../../../shared/clipboard-processing-client";
+import { formatBytes } from "../../../shared/format";
+import { statusLine } from "../../../shared/status-line";
+import { createSourceArchiveInWorker } from "../../../shared/source-archive-client";
 import {
   SOURCE_ARCHIVE_COPY_EVENT,
   SOURCE_ARCHIVE_CLEAR_EVENT,
@@ -17,7 +17,7 @@ import {
   SOURCE_ARCHIVE_PROGRESS_EVENT,
   type SourceArchiveOptionsDetail,
   type SourceArchiveProgressDetail,
-} from "../shared/source-archive-events";
+} from "../../../shared/source-archive-events";
 
 export function mountClipboardSend() {
 const fileInput = document.getElementById("clipboard-file") as HTMLInputElement;

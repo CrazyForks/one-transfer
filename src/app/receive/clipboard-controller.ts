@@ -1,10 +1,10 @@
 import {
   assertBrowserClipboardRestoreInput,
   clipboardDownloadFileName,
-} from "../shared/clipboard-transfer";
-import { decodeClipboardTransferInWorker } from "../shared/clipboard-processing-client";
-import { formatBytes } from "../shared/format";
-import { statusLine } from "../shared/status-line";
+} from "../../../shared/clipboard-transfer";
+import { decodeClipboardTransferInWorker } from "../../../shared/clipboard-processing-client";
+import { formatBytes } from "../../../shared/format";
+import { statusLine } from "../../../shared/status-line";
 
 export function mountClipboardReceive() {
   const restoreButton = document.getElementById("restore-from-clipboard") as HTMLButtonElement;

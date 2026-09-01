@@ -3,8 +3,8 @@ import { useMountedController } from "@/hooks/use-mounted-controller";
 import { useTransferChannel } from "@/app/components/transfer-channel-tabs";
 import { SendPage } from "./components/send-page";
 
-const loadSendController = () => import("../../../send/main").then((module) => module.mountSend);
-const loadClipboardSendController = () => import("../../../clipboard/main").then((module) => module.mountClipboardSend);
+const loadSendController = () => import("./controller").then((module) => module.mountSend);
+const loadClipboardSendController = () => import("./clipboard-controller").then((module) => module.mountClipboardSend);
 
 export function SendRoute() {
   const [channel, setChannel] = useTransferChannel();

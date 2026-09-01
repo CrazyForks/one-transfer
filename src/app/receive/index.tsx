@@ -3,8 +3,8 @@ import { useMountedController } from "@/hooks/use-mounted-controller";
 import { useTransferChannel } from "@/app/components/transfer-channel-tabs";
 import { ReceivePage } from "./components/receive-page";
 
-const loadReceiveController = () => import("../../../receive/main").then((module) => module.mountReceive);
-const loadClipboardReceiveController = () => import("../../../clipboard/receive").then((module) => module.mountClipboardReceive);
+const loadReceiveController = () => import("./controller").then((module) => module.mountReceive);
+const loadClipboardReceiveController = () => import("./clipboard-controller").then((module) => module.mountClipboardReceive);
 
 export function ReceiveRoute() {
   const [channel, setChannel] = useTransferChannel();

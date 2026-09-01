@@ -9,16 +9,16 @@
 // - Progress must track frames COLLECTED: LT peeling back-loads its solve
 //   cascade, so blocks-solved looks stalled and then teleports to done.
 
-import { LTDecoder } from "../shared/fountain";
+import { LTDecoder } from "../../../shared/fountain";
 import {
   estimateTransferProgress,
   expectedFountainOverhead,
   formatDuration,
-} from "../shared/progress";
+} from "../../../shared/progress";
 import { createDecodeWorker } from "./worker-factory";
-import { NoSignalHintTimer } from "../shared/no-signal";
-import { DecodeWorkerPool } from "../shared/worker-pool";
-import { isSnippet, snippetText } from "../shared/snippet";
+import { NoSignalHintTimer } from "../../../shared/no-signal";
+import { DecodeWorkerPool } from "../../../shared/worker-pool";
+import { isSnippet, snippetText } from "../../../shared/snippet";
 import {
   HEADER_LEN,
   fnv1a,
@@ -26,20 +26,20 @@ import {
   streamIdentity,
   unpackFile,
   verifyFile,
-} from "../shared/protocol";
-import { maximumFileBytes } from "../shared/frame-capacity";
-import { mediaAspectRatio } from "../shared/display";
-import { statusLine } from "../shared/status-line";
-import { requestScreenWakeLock } from "../shared/wake-lock";
+} from "../../../shared/protocol";
+import { maximumFileBytes } from "../../../shared/frame-capacity";
+import { mediaAspectRatio } from "../../../shared/display";
+import { statusLine } from "../../../shared/status-line";
+import { requestScreenWakeLock } from "../../../shared/wake-lock";
 import {
   RECEIVE_CAPTURE_CLOSE_EVENT,
   RECEIVE_CAPTURE_START_EVENT,
   type ReceiveCaptureSource,
-} from "../shared/receive-events";
+} from "../../../shared/receive-events";
 import {
   initialCameraCaptureFps,
   initialDecodeWorkers,
-} from "../shared/receive-settings";
+} from "../../../shared/receive-settings";
 import {
   parseSenderCapabilityHello,
   receiverDecodeUtilizationPercent,
@@ -48,7 +48,7 @@ import {
   recommendSenderTuning,
   type ReceiverLinkMetrics,
   type SenderCapabilityHello,
-} from "../shared/link-calibration";
+} from "../../../shared/link-calibration";
 
 export function mountReceive() {
 const startBtn = document.getElementById("start") as HTMLButtonElement;

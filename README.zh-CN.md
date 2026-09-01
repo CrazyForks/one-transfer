@@ -469,9 +469,26 @@ LT（Luby Transform）喷泉码解决该问题：
 | 20 | 可变 | Encoded Block | XOR 后的喷泉码数据块 |
 
 默认高吞吐布局持续显示 4 个可独立解码的二维码，每次画面更新同时替换四格。
-平衡档每秒产生 `4 × 30 = 120` 个 symbol、每码 1700 字节；扣除 20 字节帧头后，
-每码携带 1680 字节编码块。QR 纠错级别为 L。页面使用三个速度按钮，将二维码密度和更新率
-组合成“稳定、平衡、高速”三个档位；复杂屏幕、远距离或低质量相机应向最低档调整。
+平衡参数每秒产生 `4 × 30 = 120` 个 symbol、每码 1700 字节；扣除 20 字节帧头后，
+每码携带 1680 字节编码块。数据帧 QR 纠错级别为 L。页面使用“每码字节、刷新 FPS、
+每次更新码数”三个数字控制，设备检测会自动应用稳定、平衡或高速初值，手动修改则需确认。
+
+每个数据流开始前，发送端会先把 20 字节 `OTH1` 能力记录编码为 ECC M 二维码，
+在四格中重复显示 1.5 秒，然后才开始 LT 数据帧。为了让后启动的接收端仍能完成匹配，
+发送过程中每 10 秒会用一个码位重播约 500 ms，不更改当前数据会话。
+
+| 偏移 | 类型 | 能力字段 | 说明 |
+|---:|---|---|---|
+| 0 | `4 × u8` | Magic | ASCII `OTH1` |
+| 4 | `u8` | Version | 当前为 1 |
+| 5 | `u8` | Logical cores | 发送端逻辑线程数 |
+| 6 | `u8` | Device memory | GiB，0 表示浏览器未提供 |
+| 7 | `u8` | Refresh rate | 测得 Hz，0 表示未知 |
+| 8–11 | `4 × u8` | 发送状态 | 每次码数、目标 FPS、DPR×10、输出达成率 |
+| 12 | `u16` | Short viewport edge | 发送窗口短边 CSS 像素 |
+| 14 | `u16` | Frame bytes | 当前每码总字节数 |
+| 16 | `u16` | Session ID | 与后续 LT 帧相同 |
+| 18 | `u16` | Checksum | 前 18 字节的加和校验 |
 
 进入发送页后，One Transfer 会先检查浏览器允许读取的本机能力：逻辑 CPU 数、近似内存、
 通过动画帧测得的刷新率，以及当前窗口短边尺寸。只有完整满足条件时才选择更高档位：
@@ -479,12 +496,15 @@ LT（Luby Transform）喷泉码解决该问题：
 | 档位 | 本机推荐边界 | 原始吞吐模型 |
 |---|---|---:|
 | 稳定 | CPU、刷新率或物理像素不足 | 约 135 KiB/s |
-| 平衡 | 4+ 逻辑线程、约 45+ Hz、物理短边 1200px+ | 约 197 KiB/s |
-| 高速 | 8+ 逻辑线程、约 55+ Hz、物理短边 1800px+ | 约 271 KiB/s |
+| 平衡 | 6+ 逻辑线程、约 4+ GiB、45+ Hz、物理短边 1200px+ | 约 197 KiB/s |
+| 高速 | 8+ 逻辑线程、约 8+ GiB、55+ Hz、物理短边 1800px+ | 约 271 KiB/s |
 
-部分浏览器会因隐私策略隐藏 `deviceMemory`，未知值不会单独触发降档。页面会在档位按钮下方显示
-检测结果、推荐档位和选择原因。该检测只能判断发送电脑，无法看到接收端 CPU、相机质量或
-远程桌面压缩情况，因此识别不稳定时仍可手动降档。
+部分浏览器会因隐私策略隐藏 `deviceMemory`，未知值不会单独触发降档。页面会显示
+检测结果、推荐数字和选择原因。用户一旦开始手动编辑，延迟返回的设备检测不会覆盖这些输入。
+
+接收端解码 `OTH1` 后，结合发送 symbol 速率和自身逻辑线程数，先选择 30/45/60 之一的
+捕获 FPS 和 2–4 个解码 Worker。接收开始后每 8 秒结合平均解码耗时、忙碌丢帧、
+唯一帧率、重复率和净带宽小步调整自身 FPS/Worker；用户手动选过的字段不再被自动覆盖。
 
 ### 5.4 二维码生成与接收
 
@@ -514,10 +534,14 @@ sequenceDiagram
 
   W->>W: 在 /send 选择内部文件或输入文字
   W->>W: 封装、SHA-256、可选 gzip、LT 编码
+  W->>Q: 先显示 1.5 秒 OTH1 发送端能力
+  Q-->>R: 解码能力记录
+  R->>R: 匹配捕获 FPS 与解码 Worker
   loop 持续播放
     W->>Q: 显示 sessionId + seq + 编码块
     Q-->>R: 相机或屏幕捕获
     R->>R: ZXing Worker 解码并收集不同帧
+    W->>Q: 每 10 秒短暂重播 OTH1
   end
   R->>R: Peeling 恢复全部源块
   R->>R: FNV-1a、容器长度、解压上限和 SHA-256 校验
@@ -615,11 +639,11 @@ netKiB/s ≈ rawKiB/s × decodeSuccessRate / fountainOverhead
 搜索，只在连续失败后稀疏执行 Robust 回退。提高单码密度并不总能提高最终吞吐；当
 识别率下降时，降低密度和画面更新率反而可能更快。
 
-光学链路是单向通道，因此发送端无法根据接收结果进行闭环帧率自适应。当远程桌面或采集流
-达不到 30 帧时，接收端会看到缺失或重复的 symbol：传输会变慢，但 LT 恢复与最终校验会
-阻止损坏文件被接受。接收端根据逻辑 CPU 数量默认启动 2～4 个解码 Worker，并在持续繁忙时
-自动扩容；图像质量长期不稳定时，将唯一的速度滑块调到最低，即会使用 700 字节 / 30 次
-更新的“稳定”档位。
+光学链路是单向通道，因此能力前导帧只能让接收端自动调整自身，不能把实测结果回传并
+远程改写发送参数。当远程桌面或采集流达不到目标帧率时，接收端会看到缺失或重复的
+symbol：传输会变慢，但 LT 恢复与最终校验会阻止损坏内容被接受。接收端会显示基于实测链路的
+发送端建议数字，由操作者在发送页确认应用；图像质量长期不稳定时，可使用
+`1465 字节 / 60 FPS / 每次 1 码`的稳定参数作为回退起点。
 
 当前线协议仍使用现有 LT 喷泉码。RaptorQ 可作为后续方向，以获得更低、更稳定的恢复开销，
 但它需要引入版本化协议变更，不属于本次 4 二维码高吞吐更新。
@@ -639,33 +663,23 @@ one-transfer/
 ├── src/
 │   ├── main.tsx               # React 根节点与 BrowserRouter
 │   ├── app.tsx                # 应用入口导出
-│   ├── app/                   # 路由表、持久 Layout、导航与页面动效
-│   ├── routes/
+│   ├── app/                   # React Router 路由表、持久 Layout 与路由私有代码
+│   │   ├── components/        # 发送与接收共用组件
 │   │   ├── home/              # 首页路由
-│   │   ├── send/              # 发送页与路由私有组件
-│   │   ├── receive/           # 接收页与沉浸式扫描界面
-│   │   ├── clipboard/         # 剪贴板页与还原脚本界面
-│   │   └── components/        # 两个路由共用的文件选择组件
+│   │   ├── send/              # 发送页、二维码及剪贴板控制器
+│   │   └── receive/           # 接收页、控制器与 ZXing Worker
 │   ├── styles.css             # Chrome 109 兼容的静态 CSS 与控制器样式
 │   ├── components/            # 构建信息、更新检查与本地组件
 │   ├── hooks/                 # 跨路由控制器生命周期
 │   ├── lib/device-capabilities.ts # 浏览器设备能力检测
 │   └── lib/utils.ts           # class 合并工具
-├── send/main.ts               # 文件/文字封装、LT 编码与 QR 播放
-├── receive/
-│   ├── main.ts                # 媒体捕获、进度、恢复和结果展示
-│   ├── worker.ts              # ZXing WASM 解码 Worker
-│   ├── worker-factory.ts      # Worker 创建
-│   └── wasm-url.ts            # WASM 静态资源 URL
-├── clipboard/main.ts          # 剪贴板选择、状态和复制控制
 ├── shared/                    # 协议、喷泉码、校验、格式化与通用逻辑
 │   ├── clipboard-processing.worker.ts # 目录 ZIP、gzip、SHA-256 与 Base91
 │   └── clipboard-processing-client.ts # 剪贴板 Worker 生命周期与取消
 ├── public/                    # Windows 还原脚本与更新检查 Worker
-├── .github/workflows/         # GitHub Pages 与 Cloudflare Pages 部署
+├── .github/workflows/         # GitHub Pages 与 Cloudflare Pages 自动部署
 ├── tests/                     # 协议黄金向量和单元测试
-├── vite.config.ts             # SPA、HTTPS 开发环境和 PWA
-└── wrangler.toml              # Cloudflare Pages 配置
+└── vite.config.ts             # SPA、HTTPS 开发环境和 PWA
 ```
 
 `../deploy/add-transfer.sh` 是工作区级 Mac 辅助脚本，不属于 Web SPA 构建产物；它与网页
@@ -704,26 +718,25 @@ HTTPS；开发证书为自签名证书，首次访问需要由测试人员明确
 
 ### 10.3 Cloudflare Pages
 
-`pages.yml` 中的 `cloudflare-pages` job 会复用已经测试过的站点 artifact；只有推送到 `main`
-或手动触发时，才会通过 Wrangler 部署 `dist/`。仓库需要配置：
+`.github/workflows/pages.yml` 会在推送到 `main` 或手动触发时只执行一次测试和构建，
+再用同一份 `dist` artifact 分别部署 GitHub Pages 和 Cloudflare Pages。Cloudflare 任务会先检查
+`one-transfer` Pages 项目，不存在时自动创建。
+仓库需要配置：
 
-- `CLOUDFLARE_API_TOKEN`：仅授予 Cloudflare Pages 编辑权限；
+- `CLOUDFLARE_API_TOKEN`：授予目标账户 **Cloudflare Pages: Edit** 权限；
 - `CLOUDFLARE_ACCOUNT_ID`：Cloudflare 账户 ID。
 
-仍可在本地执行：
+本地直接部署：
 
 ```bash
-make deploy
+pnpm check
+pnpm exec wrangler pages deploy dist --project-name=one-transfer --branch=main
 ```
 
-Makefile 会读取本地 `.env` 中的 Cloudflare 凭据，执行构建后使用 Wrangler 部署
-`dist/`。Wrangler 项目名为 `one-transfer`。
+### 10.4 GitHub Actions 自动部署
 
-### 10.4 GitHub Pages 自动部署
-
-同一个 `pages.yml` 只测试和构建一次，再把 artifact 分别部署到 GitHub Pages 与 Cloudflare
-Pages。仓库 **Settings → Pages → Source** 应保持为
-**GitHub Actions**。
+工作流使用 Node.js 24 和 `package.json` 声明的 pnpm 版本，不会把 Cloudflare 凭据写入仓库。
+两个部署 job 相互独立；Cloudflare 部署失败不会阻断 GitHub Pages 部署。
 
 ### 10.5 构建版本与更新检查
 
@@ -765,7 +778,7 @@ Vite 会把 `package.json` 版本、构建时间和 Git commit 写入应用，�
 - 为剪贴板协议增加分块、序号和分段校验，适配有单次文本长度限制的通道。
 - 为两条通道增加可选的组织批准加密层和发送方认证。
 - 在 Windows 端提供签名的 PowerShell/可执行接收器，减少批处理对环境编码的依赖。
-- 基于实测建立设备预设；在存在返回通道时，可选增加发送端与接收端的闭环反馈。
+- 在更多真实设备上校准现有自动参数；存在返回通道时再增加发送端闭环反馈。
 - 建立不同文本通道、浏览器、摄像头和屏幕组合的吞吐基准矩阵。
 - 增加浏览器端目录打包，使目录传入不再依赖 Mac 辅助脚本。
 

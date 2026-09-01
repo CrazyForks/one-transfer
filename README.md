@@ -486,10 +486,28 @@ Each QR frame contains a 20-byte little-endian header followed by one encoded bl
 | 20 | variable | Encoded block | Fountain XOR output |
 
 The high-throughput layout replaces four independently decodable QR symbols on each visual tick. The
-Balanced preset emits `4 × 30 = 120` symbols per second at 1700 bytes per symbol; the 20-byte header
-leaves a 1680-byte encoded block. QR error-correction level L is used. Three speed buttons combine the
-frame-size and tick-rate choices into Stable, Balanced, and Fast presets;
-difficult displays or cameras should move it toward the minimum.
+Balanced tuning emits `4 × 30 = 120` symbols per second at 1700 bytes per symbol; the 20-byte header
+leaves a 1680-byte encoded block. Data QR symbols use error-correction level L. Three numeric controls
+expose bytes per symbol, target FPS, and symbols per tick. Device inspection automatically applies a
+Stable, Balanced, or Fast starting point; later manual edits require confirmation.
+
+Before each data stream, the sender encodes a 20-byte `OTH1` capability record as an ECC M QR symbol
+and repeats it in all four cells for 1.5 seconds. LT data frames start only after this preamble. A receiver
+that begins later can still calibrate because one cell carries a roughly 500 ms repeat burst every
+10 seconds without changing the data session.
+
+| Offset | Type | Capability field | Description |
+|---:|---|---|---|
+| 0 | `4 × u8` | Magic | ASCII `OTH1` |
+| 4 | `u8` | Version | Currently 1 |
+| 5 | `u8` | Logical cores | Sender logical CPU count |
+| 6 | `u8` | Device memory | GiB; 0 when unavailable |
+| 7 | `u8` | Refresh rate | Measured Hz; 0 when unknown |
+| 8–11 | `4 × u8` | Send state | Symbols per tick, target FPS, DPR×10, output utilization |
+| 12 | `u16` | Short viewport edge | Sender short edge in CSS pixels |
+| 14 | `u16` | Frame bytes | Current total bytes per data symbol |
+| 16 | `u16` | Session ID | Matches the following LT frames |
+| 18 | `u16` | Checksum | Additive checksum of the first 18 bytes |
 
 On the send page, One Transfer first inspects the capabilities the browser may expose: logical CPU
 count, approximate device memory, measured animation refresh rate, and the shorter viewport edge. It
@@ -498,13 +516,17 @@ then applies the highest preset whose complete requirements are met:
 | Preset | Local recommendation boundary | Raw model |
 |---|---|---:|
 | Stable | Constrained CPU, refresh rate, or physical pixels | about 135 KiB/s |
-| Balanced | 4+ logical CPUs, about 45+ Hz, 1200px+ physical short edge | about 197 KiB/s |
-| Fast | 8+ logical CPUs, about 55+ Hz, 1800px+ physical short edge | about 271 KiB/s |
+| Balanced | 6+ logical CPUs, about 4+ GiB, 45+ Hz, 1200px+ physical short edge | about 197 KiB/s |
+| Fast | 8+ logical CPUs, about 8+ GiB, 55+ Hz, 1800px+ physical short edge | about 271 KiB/s |
 
 Missing privacy-restricted values, such as `deviceMemory` in some browsers, do not automatically lower
-the recommendation. The result and its evidence are shown under the preset buttons. This inspection covers the
-sending computer only; receiver camera quality, remote-desktop compression, and receiver CPU remain
-unknown, so the user can always lower the preset manually.
+the recommendation. The page shows the measured facts, concrete tuning, and reason. Once the user begins
+editing, a delayed inspection result no longer overwrites those inputs.
+
+After decoding `OTH1`, the receiver combines the sender symbol rate with its own logical CPU count to
+choose 30, 45, or 60 capture FPS and 2–4 decode workers. Every eight seconds it uses average decode time,
+busy-frame drops, unique and duplicate frame rates, and net goodput to make a small local FPS/worker
+adjustment. Any field explicitly set by the user is left alone.
 
 ### 5.4 Capture and Decode
 
@@ -534,10 +556,14 @@ sequenceDiagram
 
   W->>W: Select an internal file or enter text
   W->>W: Pack, hash, optionally gzip, and LT-encode
+  W->>Q: Show OTH1 sender capabilities for 1.5 seconds
+  Q-->>R: Decode the capability record
+  R->>R: Match capture FPS and decode workers
   loop Continuous playback
     W->>Q: Render sessionId + seq + encoded block
     Q-->>R: Camera or screen capture
     R->>R: ZXing worker decoding and frame collection
+    W->>Q: Briefly repeat OTH1 every 10 seconds
   end
   R->>R: Peeling recovery
   R->>R: FNV, bounds, decompression, and SHA-256 checks
@@ -628,12 +654,13 @@ paying for difficult-image searches on every frame; a robust pass is attempted o
 misses. A denser QR frame is not always faster, and reducing density or tick rate can raise end-to-end
 goodput when recognition is unstable.
 
-The optical link is intentionally one-way, so the sender cannot perform feedback-based FPS adaptation.
-If a remote desktop or capture stream delivers fewer than 30 visual frames per second, the receiver sees
-missing or repeated symbols: completion takes longer, but LT recovery and the final checksum prevent a
-damaged file from being accepted. The receiver starts 2–4 decode workers from the available logical CPU
-count and can grow the pool when workers remain saturated. For a persistently weak image, moving the
-single speed slider to its minimum selects the 700-byte / 30-tick Stable preset.
+The optical link is intentionally one-way. The capability preamble lets the receiver tune itself, but it
+cannot return measured results or remotely rewrite sender settings. When a remote desktop or capture
+stream misses the target frame rate, the receiver sees missing or repeated symbols: completion takes
+longer, but LT recovery and final verification prevent damaged content from being accepted. The receiver
+shows concrete sender numbers derived from the measured link for an operator to confirm on the send page.
+For a persistently weak image, `1465 bytes / 60 FPS / 1 symbol per tick` is the Stable fallback starting
+point.
 
 The current wire protocol still uses the existing LT fountain code. RaptorQ is a future option for
 lower and more predictable recovery overhead, but adopting it requires a versioned protocol change and
@@ -655,33 +682,23 @@ one-transfer/
 ├── src/
 │   ├── main.tsx               # React root and BrowserRouter
 │   ├── app.tsx                # Application entry export
-│   ├── app/                   # Route table, persistent layout, navigation, and page motion
-│   ├── routes/
+│   ├── app/                   # React Router table, persistent layout, and route-owned code
+│   │   ├── components/        # Components shared by send and receive
 │   │   ├── home/              # Home route
-│   │   ├── send/              # Send route and route-local components
-│   │   ├── receive/           # Receive route and immersive capture UI
-│   │   ├── clipboard/         # Clipboard route and restorer UI
-│   │   └── components/        # File selection shared by two routes
+│   │   ├── send/              # Send page plus QR and clipboard controllers
+│   │   └── receive/           # Receive page, controllers, and ZXing Worker
 │   ├── styles.css             # Chrome 109-compatible static and controller styles
 │   ├── components/            # Build info, update checker, and local components
 │   ├── hooks/                 # Cross-route controller lifecycle
 │   ├── lib/device-capabilities.ts # Browser capability inspection
 │   └── lib/utils.ts           # Class merging helper
-├── send/main.ts               # Container creation, LT encoding, QR playback
-├── receive/
-│   ├── main.ts                # Capture, progress, recovery, result UI
-│   ├── worker.ts              # ZXing WASM decode worker
-│   ├── worker-factory.ts      # Worker construction
-│   └── wasm-url.ts            # Decoder WASM asset URL
-├── clipboard/main.ts          # Clipboard selection, status, and copy controller
 ├── shared/                    # Protocols, fountain code, validation, utilities
 │   ├── clipboard-processing.worker.ts # Directory ZIP, gzip, SHA-256, and Base91
 │   └── clipboard-processing-client.ts # Clipboard Worker lifecycle and cancellation
 ├── public/                    # Windows receiver and update-check Worker
 ├── .github/workflows/         # GitHub Pages and Cloudflare Pages deployment
 ├── tests/                     # Golden vectors and unit tests
-├── vite.config.ts             # SPA, HTTPS development, and PWA configuration
-└── wrangler.toml              # Cloudflare Pages configuration
+└── vite.config.ts             # SPA, HTTPS development, and PWA configuration
 ```
 
 `../deploy/add-transfer.sh` is a workspace-level Mac helper and is not part of the SPA build. It shares
@@ -717,26 +734,26 @@ The development certificate is self-signed and must be explicitly accepted on ea
 
 ### 10.3 Cloudflare Pages
 
-The `cloudflare-pages` job in `pages.yml` reuses the tested site artifact. A push to `main` or a manual
-dispatch deploys `dist/` with Wrangler. Configure these repository secrets:
+`.github/workflows/pages.yml` tests and builds the site once on pushes to `main` or manual dispatches,
+then deploys the same `dist` artifact independently to GitHub Pages and Cloudflare Pages. The Cloudflare
+job checks for the `one-transfer` Pages project and creates it when absent.
+Configure these repository secrets:
 
-- `CLOUDFLARE_API_TOKEN`, limited to Cloudflare Pages edit access;
+- `CLOUDFLARE_API_TOKEN`, scoped to **Cloudflare Pages: Edit** on the target account;
 - `CLOUDFLARE_ACCOUNT_ID`.
 
-Local deployment remains available:
+Local direct deployment uses:
 
 ```bash
-make deploy
+pnpm check
+pnpm exec wrangler pages deploy dist --project-name=one-transfer --branch=main
 ```
 
-The Makefile loads local Cloudflare credentials from `.env`, builds `dist/`, and deploys the Wrangler
-project `one-transfer`.
+### 10.4 GitHub Actions Automation
 
-### 10.4 GitHub Pages Automation
-
-The same `pages.yml` workflow tests and builds once, then deploys the artifact independently to GitHub
-Pages and Cloudflare Pages. In repository **Settings → Pages**, keep
-**Source** set to **GitHub Actions**.
+The workflow uses Node.js 24 and the pnpm version declared in `package.json`. Cloudflare credentials stay
+in GitHub Secrets. The GitHub Pages and Cloudflare Pages deployment jobs are independent, so one provider
+failing does not block the other deployment.
 
 ### 10.5 Build Version and Update Checks
 
@@ -774,7 +791,7 @@ runtime checks that static builds cannot replace.
 - Add clipboard chunking, sequence numbers, and per-segment checksums.
 - Add an optional approved encryption and sender-authentication layer.
 - Provide a signed PowerShell or executable Windows receiver.
-- Add measured device presets and optional sender/receiver feedback when a return channel is available.
+- Calibrate the current automatic tuning across more real devices, and add closed-loop sender feedback only when a return channel is available.
 - Build a performance matrix across text channels, browsers, cameras, and displays.
 - Add browser-side directory packaging.
 

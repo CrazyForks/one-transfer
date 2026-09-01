@@ -1,4 +1,4 @@
-// QR decode worker: zxing-cpp compiled to WASM. (Safari has never shipped
+// Route-local QR decode worker: zxing-cpp compiled to WASM. (Safari has never shipped
 // BarcodeDetector — WebKit bug 281848 — so WASM is the only portable way.)
 // One frame in flight per worker; the main thread drops frames when all
 // workers are busy. Frames are disposable — the fountain doesn't care.

@@ -16,35 +16,35 @@ import {
   canFitQrGridAtIntegerPixels,
   fitQrDisplayArea,
   integerQrGridLayout,
-} from "../shared/display";
-import { rasterizeQr } from "../shared/qr-raster";
-import { formatBytes } from "../shared/format";
+} from "../../../shared/display";
+import { rasterizeQr } from "../../../shared/qr-raster";
+import { formatBytes } from "../../../shared/format";
 import {
   blockLength,
   fitsInOneStream,
   maximumFileBytes,
   minimumFrameBytes,
   sourceBlockCount,
-} from "../shared/frame-capacity";
-import { LTEncoder } from "../shared/fountain";
-import { MAX_SNIPPET_BYTES, MAX_SNIPPET_LABEL, packSnippet } from "../shared/snippet";
+} from "../../../shared/frame-capacity";
+import { LTEncoder } from "../../../shared/fountain";
+import { MAX_SNIPPET_BYTES, MAX_SNIPPET_LABEL, packSnippet } from "../../../shared/snippet";
 import {
   fnv1a,
   packFile,
   packFrame,
   type FrameHeader,
   type PackedOpticalFile,
-} from "../shared/protocol";
-import { statusLine } from "../shared/status-line";
-import { requestScreenWakeLock } from "../shared/wake-lock";
-import { expectedFountainOverhead } from "../shared/progress";
+} from "../../../shared/protocol";
+import { statusLine } from "../../../shared/status-line";
+import { requestScreenWakeLock } from "../../../shared/wake-lock";
+import { expectedFountainOverhead } from "../../../shared/progress";
 import {
   SEND_CAPABILITIES_EVENT,
   SEND_PROGRESS_EVENT,
   isSendProgressReportDue,
   type SenderCapabilitiesDetail,
   type SendProgressDetail,
-} from "../shared/send-events";
+} from "../../../shared/send-events";
 import {
   DEFAULT_SEND_TUNING,
   QR_GRID_CELLS,
@@ -53,11 +53,11 @@ import {
   SEND_TUNING_LIMITS,
   normalizeSendTuning,
   type SendTuning,
-} from "../shared/send-settings";
-import { createSourceArchiveInWorker } from "../shared/source-archive-client";
-import { createClipboardDirectoryArchiveInWorker } from "../shared/clipboard-processing-client";
-import { isValidWindowsFileName } from "../shared/clipboard-transfer";
-import { packSenderCapabilityHello } from "../shared/link-calibration";
+} from "../../../shared/send-settings";
+import { createSourceArchiveInWorker } from "../../../shared/source-archive-client";
+import { createClipboardDirectoryArchiveInWorker } from "../../../shared/clipboard-processing-client";
+import { isValidWindowsFileName } from "../../../shared/clipboard-transfer";
+import { packSenderCapabilityHello } from "../../../shared/link-calibration";
 import {
   SOURCE_ARCHIVE_PROGRESS_EVENT,
   SOURCE_ARCHIVE_CLEAR_EVENT,
@@ -65,7 +65,7 @@ import {
   SOURCE_ARCHIVE_SEND_EVENT,
   type SourceArchiveOptionsDetail,
   type SourceArchiveProgressDetail,
-} from "../shared/source-archive-events";
+} from "../../../shared/source-archive-events";
 
 const MARGIN = 4; // quiet-zone modules
 const LOOKAHEAD_SYMBOLS = 8;
@@ -489,7 +489,11 @@ const onResize = () => resizeDisplay?.();
 const onSpeedChange = (event: Event) => {
   sendTuning = normalizeSendTuning((event as CustomEvent<SendTuning>).detail);
   updateFileLimitLabel();
-  void startStream(false, true);
+  // Capability inspection finishes asynchronously. If it completes while a
+  // file is still being read or archived, restarting here would invalidate
+  // that in-flight selection. The selection will start with the new tuning
+  // once preparation finishes; only an already prepared stream needs restart.
+  if (selectedFile) void startStream(false, true);
 };
 const onSenderCapabilities = (event: Event) => {
   detectedSenderCapabilities = (event as CustomEvent<SenderCapabilitiesDetail>).detail;
@@ -650,6 +654,20 @@ async function startStream(revealStage = false, preserveDialog = false) {
     }
   }
 
+  const showStreamStatus = () => {
+    if (version === undefined) return;
+    const refreshMode = symbolsPerTick === QR_GRID_CELLS ? "同步刷新" : "轮流刷新";
+    const refreshesPerCode = txFps * symbolsPerTick / QR_GRID_CELLS;
+    setStatus(
+      `${QR_GRID_CELLS} QR ${refreshMode} · ` +
+        `${txFps * symbolsPerTick} symbols/s · 每码 ${refreshesPerCode} 次/s · ` +
+        `${frameBytes} 字节 · V${version} · ${scale} px/模块 · ECC ${ecc} · ` +
+        `${name} · ${formatBytes(fileSize)} · ` +
+        `${compression === "gzip" ? `gzip 后 ${formatBytes(transmittedSize)}` : "未压缩"} · ` +
+        `K=${encoder.k}`,
+    );
+  };
+
   const makeFrame = (): ImageData => {
     const bytes = packFrame({ ...header, seq: nextSeq }, encoder.encode(nextSeq));
     nextSeq++;
@@ -667,16 +685,7 @@ async function startStream(revealStage = false, preserveDialog = false) {
       // Scroll only now: before sizeCanvas() the canvas is still 16×16, so the
       // scroll target would be the wrong height.
       if (revealStage) scrollStageIntoView();
-      const refreshMode = symbolsPerTick === QR_GRID_CELLS ? "同步刷新" : "轮流刷新";
-      const refreshesPerCode = txFps * symbolsPerTick / QR_GRID_CELLS;
-      setStatus(
-        `${QR_GRID_CELLS} QR ${refreshMode} · ` +
-          `${txFps * symbolsPerTick} symbols/s · 每码 ${refreshesPerCode} 次/s · ` +
-          `${frameBytes} 字节 · V${version} · ${scale} px/模块 · ECC ${ecc} · ` +
-          `${name} · ${formatBytes(fileSize)} · ` +
-          `${compression === "gzip" ? `gzip 后 ${formatBytes(transmittedSize)}` : "未压缩"} · ` +
-          `K=${encoder.k}`,
-      );
+      showStreamStatus();
     }
     const raster = rasterizeQr(qr.modules.size, qr.modules.data, MARGIN);
     return new ImageData(new Uint8ClampedArray(raster.pixels.buffer), raster.size, raster.size);
@@ -745,6 +754,7 @@ async function startStream(revealStage = false, preserveDialog = false) {
   if (gen !== generation) return;
 
   initialFrames.forEach((frame, index) => drawSymbol(index, frame));
+  showStreamStatus();
   emittedSymbols = initialFrames.length;
   const emittedInInitialRound = ((emittedSymbols - 1) % targetSymbols) + 1;
   reportSendProgress({
