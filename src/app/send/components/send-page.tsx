@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { gsap } from "gsap";
 import { FolderOpen } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -244,6 +243,14 @@ const sendTuningDraftSchema = z.object({
 
 type SendTuningDraft = z.infer<typeof sendTuningDraftSchema>;
 
+function validateTuningDraftField(
+  field: keyof SendTuningDraft,
+  value: string,
+): true | string {
+  const parsed = sendTuningDraftSchema.shape[field].safeParse(value);
+  return parsed.success ? true : parsed.error.issues[0]?.message ?? "参数无效";
+}
+
 function tuningToDraft(tuning: Readonly<SendTuning>): SendTuningDraft {
   return {
     frameBytes: String(tuning.frameBytes),
@@ -275,7 +282,6 @@ function TransferSpeedControl({ compact = false }: { compact?: boolean }) {
     reset,
     watch,
   } = useForm<SendTuningDraft>({
-    resolver: zodResolver(sendTuningDraftSchema),
     mode: "onChange",
     defaultValues: tuningToDraft(DEFAULT_SEND_TUNING),
   });
@@ -365,7 +371,10 @@ function TransferSpeedControl({ compact = false }: { compact?: boolean }) {
               step={25}
               aria-invalid={Boolean(errors.frameBytes)}
               aria-describedby="send-tuning-form-status"
-              {...register("frameBytes", { onChange: () => { manuallySelected.current = true; } })}
+              {...register("frameBytes", {
+                validate: (value) => validateTuningDraftField("frameBytes", value),
+                onChange: () => { manuallySelected.current = true; },
+              })}
             />
           </label>
           <label>
@@ -377,7 +386,10 @@ function TransferSpeedControl({ compact = false }: { compact?: boolean }) {
               step={1}
               aria-invalid={Boolean(errors.txFps)}
               aria-describedby="send-tuning-form-status"
-              {...register("txFps", { onChange: () => { manuallySelected.current = true; } })}
+              {...register("txFps", {
+                validate: (value) => validateTuningDraftField("txFps", value),
+                onChange: () => { manuallySelected.current = true; },
+              })}
             />
           </label>
           <label>
@@ -389,7 +401,10 @@ function TransferSpeedControl({ compact = false }: { compact?: boolean }) {
               step={1}
               aria-invalid={Boolean(errors.symbolsPerTick)}
               aria-describedby="send-tuning-form-status"
-              {...register("symbolsPerTick", { onChange: () => { manuallySelected.current = true; } })}
+              {...register("symbolsPerTick", {
+                validate: (value) => validateTuningDraftField("symbolsPerTick", value),
+                onChange: () => { manuallySelected.current = true; },
+              })}
             />
           </label>
         </div>
