@@ -728,6 +728,17 @@ pnpm preview:lan  # LAN production preview
 pnpm check        # tests followed by production build
 ```
 
+After copying only `dist/` to the cloud computer, start it without installing dependencies:
+
+```bash
+cd dist
+node serve.mjs       # http://127.0.0.1:8080
+node serve.mjs 9000  # optional custom port
+```
+
+`serve.mjs` provides SPA fallback for direct visits and refreshes on `/send` and `/receive`. It listens
+on localhost by default; set `ONE_TRANSFER_HOST=0.0.0.0` only when LAN access is required.
+
 `pnpm dev` binds to `127.0.0.1`. `pnpm dev:lan` intentionally lists every active Wi-Fi, VPN, virtual
 machine, and tunnel address; they all point to the same Vite process. LAN camera use requires HTTPS.
 The development certificate is self-signed and must be explicitly accepted on each test device.

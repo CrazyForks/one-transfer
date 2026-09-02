@@ -709,6 +709,17 @@ pnpm preview:lan # 在局域网预览生产构建
 pnpm check     # 依次执行测试和生产构建
 ```
 
+把 `dist/` 单独复制到云电脑后，无需安装依赖，直接在该目录启动：
+
+```bash
+cd dist
+node serve.mjs       # http://127.0.0.1:8080
+node serve.mjs 9000  # 可选：指定端口
+```
+
+`serve.mjs` 会处理 `/send` 和 `/receive` 的 SPA 直达与刷新回退。默认仅监听本机；
+需要局域网访问时可设置 `ONE_TRANSFER_HOST=0.0.0.0`。
+
 接收页面依赖 `getUserMedia` 和 `getDisplayMedia`。局域网设备访问开发服务器时必须使用
 HTTPS；开发证书为自签名证书，首次访问需要由测试人员明确接受。
 
