@@ -1,3 +1,4 @@
+import { RECEIVED_TEXT_EVENT, setReceivedText } from "./received-text";
 // Receiver: shared desktop or camera → WASM QR decode in workers → fountain
 // decoder → file.
 //
@@ -802,34 +803,10 @@ function showNoSignalHint() {
   result.replaceChildren(panel);
 }
 
-/** Nothing is persisted: the text lives here until the page is closed. */
 function showSnippet(text: string) {
-  const heading = document.createElement("div");
-  heading.className = "done";
-  heading.textContent = "文字已接收";
-
-  const body = document.createElement("p");
-  body.className = "received-note";
-  body.textContent = text;
-
-  const actions = document.createElement("div");
-  actions.className = "note-actions";
-  const copy = document.createElement("button");
-  copy.type = "button";
-  copy.className = "text-button";
-  copy.textContent = "复制";
-  copy.addEventListener("click", async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-      copy.textContent = "已复制";
-      setTimeout(() => { copy.textContent = "复制"; }, 1500);
-    } catch {
-      copy.textContent = "复制失败";
-    }
-  });
-  actions.append(copy);
-
-  replaceResult(heading, body, actions);
+  setReceivedText(text);
+  stopCaptureForNavigation();
+  window.dispatchEvent(new Event(RECEIVED_TEXT_EVENT));
 }
 
 function updateStats() {

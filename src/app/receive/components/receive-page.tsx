@@ -1,3 +1,5 @@
+import { Link, useNavigate } from "react-router-dom";
+import { getReceivedText, RECEIVED_TEXT_EVENT } from "../received-text";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Settings2, X } from "lucide-react";
@@ -16,6 +18,17 @@ import {
 } from "../../../../shared/receive-events";
 
 function QrReceivePanel() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const showText = () => {
+      setCaptureOpen(false);
+      setCaptureSettingsOpen(false);
+      navigate("/receive/text");
+    };
+    window.addEventListener(RECEIVED_TEXT_EVENT, showText);
+    return () => window.removeEventListener(RECEIVED_TEXT_EVENT, showText);
+  }, [navigate]);
   const [captureOpen, setCaptureOpen] = useState(false);
   const [captureSettingsOpen, setCaptureSettingsOpen] = useState(false);
 
@@ -54,6 +67,7 @@ function QrReceivePanel() {
           <Button id="start" type="button" className="app-style-75" onClick={() => startCapture("screen")}>扫描电脑屏幕</Button>
           <Button id="start-camera" type="button" variant="outline" onClick={() => startCapture("camera")}>使用相机</Button>
         </div>
+        {getReceivedText() !== null && <Button asChild variant="outline"><Link to="/receive/text">查看上次接收的文字</Link></Button>}
         {createPortal(<div
           hidden={!captureOpen}
           className="receive-capture-dialog"
